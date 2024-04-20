@@ -87,10 +87,12 @@ impl State {
     }
 
     pub fn window(&self) -> &Window {
+        // Get a reference to `self.window`.
         &self.window
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        // Configures `self.surface` to match `new_size`.
         if new_size.width > 0 && new_size.height > 0 { // height or width being 0 may cause crashes
             self.size = new_size;
             self.config.width = new_size.width;
@@ -100,7 +102,9 @@ impl State {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        todo!()
+        // Returns a bool to indicate whether `event` has been fully processed.
+        // May be used to instruct an event loop to not process `event` any further.
+        false
     }
 
     fn update(&mut self) {
@@ -153,26 +157,28 @@ pub async fn run() {
         Event::WindowEvent {
             ref event,
             window_id,
-        } if window_id == state.window().id() => match event {
-            WindowEvent::CloseRequested | 
-            WindowEvent::KeyboardInput {
-                input: KeyboardInput {
-                    state: ElementState::Pressed,
-                    virtual_keycode: Some(VirtualKeyCode::Escape),
+        } if window_id == state.window().id() => if !state.input(event) { 
+            match event {
+                WindowEvent::CloseRequested | 
+                WindowEvent::KeyboardInput {
+                    input: KeyboardInput {
+                        state: ElementState::Pressed,
+                        virtual_keycode: Some(VirtualKeyCode::Escape),
+                        ..
+                    },
                     ..
-                },
-                ..
-            } => {
-                *control_flow = ControlFlow::Exit;
+                } => {
+                    *control_flow = ControlFlow::Exit;
+                }
+                WindowEvent::Resized(physical_size) => {
+                    state.resize(*physical_size);
+                }
+                WindowEvent::ScaleFactorChanged{ new_inner_size, .. } => {
+                    state.resize(**new_inner_size);
+                }
+                _ => {}
             }
-            WindowEvent::Resized(physical_size) => {
-                state.resize(*physical_size);
-            }
-            WindowEvent::ScaleFactorChanged{ new_inner_size, .. } => {
-                state.resize(**new_inner_size);
-            }
-            _ => {}
-        },
+        }
         _ => {}
     });
 }
