@@ -15,6 +15,7 @@ pub struct State {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
+    clear_color: wgpu::Color,
     window: Window,
 }
 
@@ -76,12 +77,21 @@ impl State {
         };
         surface.configure(&device, &config);
 
+        // Set up a default screen clear colour
+        let clear_color = wgpu::Color {
+            r: 0.1,
+            g: 0.2,
+            b: 0.3,
+            a: 1.0,
+        };
+
         Self {
             surface,
             device,
             queue,
             config,
             size,
+            clear_color,
             window,
         }
     }
@@ -104,7 +114,18 @@ impl State {
     fn input(&mut self, event: &WindowEvent) -> bool {
         // Returns a bool to indicate whether `event` has been fully processed.
         // May be used to instruct an event loop to not process `event` any further.
-        false
+        match event {
+            WindowEvent::CursorMoved { position, .. } => {
+                self.clear_color = wgpu::Color {
+                    r: position.x / self.size.width as f64,
+                    g: position.y / self.size.height as f64,
+                    b: 1.0,
+                    a: 1.0,
+                };
+                true
+            }
+            _ => false,
+        }
     }
 
     fn update(&mut self) {
@@ -124,16 +145,14 @@ impl State {
         let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
+                view: &view, // Render to the view created above (the output texture)
+                resolve_target: None, // The same as `view` unless multisampling is enabled
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
-                    }),
-                    store: wgpu::StoreOp::Store,
+                    // Load tells wgpu what to do with colours stored from the previous frame (here we're just clearing them to a specified colour)
+                    load: wgpu::LoadOp::Clear(self.clear_color),
+                    // Tells wgpu whether we want to store the rendered results to the `Texture` behind the `TextureView` in `view`
+                    // In this case, that `Texture` is the `SurfaceTexture` and we do want to store the rendered results there
+                    store: wgpu::StoreOp::Store, 
                 },
             })],
             depth_stencil_attachment: None,
