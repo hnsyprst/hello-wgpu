@@ -2,5 +2,5 @@ use hello_wgpu::run;
 
 fn main() {
     println!("Hello, window!");
-    run();
+    pollster::block_on(run());
 }
