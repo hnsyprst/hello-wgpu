@@ -1,6 +1,7 @@
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 
+use wgpu::Color;
 use winit::{
     event::{self, *},
     event_loop::{self, ControlFlow, EventLoop},
@@ -16,8 +17,54 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     clear_color: wgpu::Color,
-    render_pipeline: wgpu::RenderPipeline,
+    render_pipelines: [wgpu::RenderPipeline; 2],
+    render_pipeline_index: usize,
     window: Window,
+}
+
+fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, shader: &wgpu::ShaderModule) -> wgpu::RenderPipeline {
+    let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
+        label: Some("Render Pipeline Layout"),
+        bind_group_layouts: &[],
+        push_constant_ranges: &[],
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor { 
+        label: Some("Render Pipeline"),
+        layout: Some(&render_pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: "vs_main",
+            buffers: &[],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: "fs_main",
+            targets: &[Some(wgpu::ColorTargetState {
+                format: config.format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::TriangleList, // Every three vertices will correspond to one triangle
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw, // Tris are facing forward if vertices are arranged in counter-clockwise order
+            cull_mode: Some(wgpu::Face::Back), // Tris not facing forward should be culled
+            // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+            polygon_mode: wgpu::PolygonMode::Fill,
+            // Requires Features::DEPTH_CLIP_CONTROL
+            unclipped_depth: false,
+            // Requires Features::CONSERVATIVE_RASTERIZATION
+            conservative: false,
+        },
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState {
+            count: 1, // No multisampling
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
+        multiview: None,
+    })
 }
 
 impl State {
@@ -87,52 +134,19 @@ impl State {
         };
 
         // Set up the render pipeline
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
+        let default_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
             label: Some("Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
-        let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
-            label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[],
-            push_constant_ranges: &[],
+        let colourful_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
+            label: Some("Colourful Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("colourful_shader.wgsl").into()),
         });
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor { 
-            label: Some("Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList, // Every three vertices will correspond to one triangle
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw, // Tris are facing forward if vertices are arranged in counter-clockwise order
-                cull_mode: Some(wgpu::Face::Back), // Tris not facing forward should be culled
-                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                polygon_mode: wgpu::PolygonMode::Fill,
-                // Requires Features::DEPTH_CLIP_CONTROL
-                unclipped_depth: false,
-                // Requires Features::CONSERVATIVE_RASTERIZATION
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1, // No multisampling
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
+        let render_pipelines = [
+            create_render_pipeline_with_shader(&device, &config, &default_shader),
+            create_render_pipeline_with_shader(&device, &config, &colourful_shader),
+        ];
+        let render_pipeline_index: usize = 0;
 
         Self {
             surface,
@@ -141,7 +155,8 @@ impl State {
             config,
             size,
             clear_color,
-            render_pipeline,
+            render_pipelines,
+            render_pipeline_index,
             window,
         }
     }
@@ -172,6 +187,17 @@ impl State {
                     b: 1.0,
                     a: 1.0,
                 };
+                true
+            },
+            WindowEvent::KeyboardInput {
+                input: KeyboardInput {
+                    state: ElementState::Pressed,
+                    virtual_keycode: Some(VirtualKeyCode::Space),
+                    ..
+                },
+                ..
+            } => {
+                self.render_pipeline_index = (self.render_pipeline_index + 1) % self.render_pipelines.len();
                 true
             }
             _ => false,
@@ -209,10 +235,9 @@ impl State {
             occlusion_query_set: None,
             timestamp_writes: None,
         });
-        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_index]);
         render_pass.draw(0..3, 0..1); // Draw 3 vertices and 1 instance
         drop(render_pass); // Need to drop `render_pass` to release the mutable borrow of `encoder` so we can call `encoder.finish()`
-
 
         // `Queue.submit()` will accept anything that implements `IntoIter`, so we wrap `encoder.finish()` up in `std::iter::once`
         self.queue.submit(std::iter::once(encoder.finish()));
