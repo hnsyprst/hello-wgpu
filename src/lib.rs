@@ -41,11 +41,19 @@ impl Vertex {
 // Make a triangle
 const VERTICES: &[Vertex] = &[
     // Vertices arranged in counter-clockwise order
-    Vertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] }, // top
-    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] }, // bottom left
-    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] }, // bottom right
+    Vertex { position: [-0.0868241, 0.49240386, 0.0], color: [0.5, 0.5, 0.0] },
+    Vertex { position: [-0.49513406, 0.06958647, 0.0], color: [0.0, 0.5, 0.5] },
+    Vertex { position: [-0.21918549, -0.44939706, 0.0], color: [0.5, 0.0, 0.5] },
+    Vertex { position: [0.35966998, -0.3473291, 0.0], color: [0.0, 0.0, 0.5] },
+    Vertex { position: [0.44147372, 0.2347359, 0.0], color: [0.5, 0.0, 0.0] },
 ];
 
+const INDICES: &[u16] = &[
+    0, 1, 4,
+    1, 2, 4,
+    2, 3, 4,
+];
+ 
 fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, shader: &wgpu::ShaderModule) -> wgpu::RenderPipeline {
     let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
         label: Some("Render Pipeline Layout"),
@@ -101,7 +109,8 @@ pub struct State {
     render_pipelines: [wgpu::RenderPipeline; 2],
     render_pipeline_index: usize,
     vertex_buffer: wgpu::Buffer,
-    num_vertices: u32,
+    index_buffer: wgpu::Buffer,
+    num_indices: u32,
     window: Window,
 }
 
@@ -186,13 +195,18 @@ impl State {
         ];
         let render_pipeline_index: usize = 0;
 
-        // Set up the vertex buffer
+        // Set up the vertex and index buffers
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(VERTICES),
             usage: wgpu::BufferUsages::VERTEX,
         });
-        let num_vertices = VERTICES.len() as u32;
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(INDICES),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+        let num_indices = INDICES.len() as u32;
 
         Self {
             surface,
@@ -204,7 +218,8 @@ impl State {
             render_pipelines,
             render_pipeline_index,
             vertex_buffer,
-            num_vertices,
+            index_buffer,
+            num_indices,
             window,
         }
     }
@@ -285,7 +300,8 @@ impl State {
         });
         render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_index]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.draw(0..self.num_vertices, 0..1); // Draw 3 vertices and 1 instance
+        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..self.num_indices, 0, 0..1); // Draw 3 vertices and 1 instance
         drop(render_pass); // Need to drop `render_pass` to release the mutable borrow of `encoder` so we can call `encoder.finish()`
 
         // `Queue.submit()` will accept anything that implements `IntoIter`, so we wrap `encoder.finish()` up in `std::iter::once`
