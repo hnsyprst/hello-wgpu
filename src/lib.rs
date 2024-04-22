@@ -1,26 +1,50 @@
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 
-use wgpu::Color;
+use wgpu::{util::DeviceExt, Color};
+
 use winit::{
     event::{self, *},
     event_loop::{self, ControlFlow, EventLoop},
-    window::{self, WindowBuilder},
+    window::{self, Window, WindowBuilder},
 };
 
-use winit::window::Window;
-
-pub struct State {
-    surface: wgpu::Surface,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    size: winit::dpi::PhysicalSize<u32>,
-    clear_color: wgpu::Color,
-    render_pipelines: [wgpu::RenderPipeline; 2],
-    render_pipeline_index: usize,
-    window: Window,
+// When adding a field here, remember to add it's corresponding wgpu::VertexAttribute to vertex::describe()
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct Vertex {
+    position: [f32; 3],
+    color: [f32; 3],
 }
+
+impl Vertex {
+    fn describe() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress, // `array_stride` defines how wide a vertex is; when the shader goes to read the next vertex, it will skip over `array_stride` bytes
+            step_mode: wgpu::VertexStepMode::Vertex, // `step_mode` tells the pipeline whether each element of the array represents per-vertex or per-instance data
+            attributes: &[ // The attributes that make up a single vertex
+                wgpu::VertexAttribute {
+                    offset: 0, // defines the offset in bytes from the start of the struct until this attribute begins
+                    shader_location: 0, // which location in the shader to store this attribute (in this case, @location(0))
+                    format: wgpu::VertexFormat::Float32x3, // `format` tells the shader the shape of the attribute: `Float32x3` corresponds to `vec3<f32>`
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x3,
+                }
+            ]
+        }
+    }
+}
+
+// Make a triangle
+const VERTICES: &[Vertex] = &[
+    // Vertices arranged in counter-clockwise order
+    Vertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] }, // top
+    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] }, // bottom left
+    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] }, // bottom right
+];
 
 fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, shader: &wgpu::ShaderModule) -> wgpu::RenderPipeline {
     let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
@@ -34,7 +58,7 @@ fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::Surf
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: "vs_main",
-            buffers: &[],
+            buffers: &[Vertex::describe()],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -65,6 +89,20 @@ fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::Surf
         },
         multiview: None,
     })
+}
+
+pub struct State {
+    surface: wgpu::Surface,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
+    size: winit::dpi::PhysicalSize<u32>,
+    clear_color: wgpu::Color,
+    render_pipelines: [wgpu::RenderPipeline; 2],
+    render_pipeline_index: usize,
+    vertex_buffer: wgpu::Buffer,
+    num_vertices: u32,
+    window: Window,
 }
 
 impl State {
@@ -148,6 +186,14 @@ impl State {
         ];
         let render_pipeline_index: usize = 0;
 
+        // Set up the vertex buffer
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let num_vertices = VERTICES.len() as u32;
+
         Self {
             surface,
             device,
@@ -157,6 +203,8 @@ impl State {
             clear_color,
             render_pipelines,
             render_pipeline_index,
+            vertex_buffer,
+            num_vertices,
             window,
         }
     }
@@ -236,7 +284,8 @@ impl State {
             timestamp_writes: None,
         });
         render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_index]);
-        render_pass.draw(0..3, 0..1); // Draw 3 vertices and 1 instance
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.draw(0..self.num_vertices, 0..1); // Draw 3 vertices and 1 instance
         drop(render_pass); // Need to drop `render_pass` to release the mutable borrow of `encoder` so we can call `encoder.finish()`
 
         // `Queue.submit()` will accept anything that implements `IntoIter`, so we wrap `encoder.finish()` up in `std::iter::once`
