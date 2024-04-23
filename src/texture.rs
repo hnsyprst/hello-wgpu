@@ -40,7 +40,7 @@ impl Texture {
                 dimension: wgpu::TextureDimension::D2, // 2D texture
                 format: wgpu::TextureFormat::Rgba8UnormSrgb,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, // Use in shaders
-                label: Some("diffuse_texture"),
+                label: label,
                 view_formats: &[],
             }
         );
