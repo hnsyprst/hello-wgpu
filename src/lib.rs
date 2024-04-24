@@ -2,6 +2,7 @@
 use wasm_bindgen::prelude::*;
 
 mod texture;
+mod camera;
 
 use wgpu::{util::DeviceExt, Color};
 
@@ -55,50 +56,6 @@ const INDICES: &[u16] = &[
     1, 2, 4,
     2, 3, 4,
 ];
-
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 0.5, 0.5,
-    0.0, 0.0, 0.0, 1.0,
-);
-
-struct Camera {
-    eye: cgmath::Point3<f32>,
-    target: cgmath::Point3<f32>,
-    up: cgmath::Vector3<f32>,
-    aspect: f32,
-    fovy: f32,
-    znear: f32,
-    zfar: f32,
-}
-
-impl Camera {
-    fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up); // move the world to be at the position and rotation of the camera
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-        OPENGL_TO_WGPU_MATRIX * proj * view // cgmath is built for OpenGL, better (and might be fun) to implement this fn manually
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniform {
-    view_proj: [[f32; 4]; 4],
-}
-
-impl CameraUniform {
-    fn new() -> Self {
-        use cgmath::SquareMatrix;
-        Self {
-            view_proj: cgmath::Matrix4::identity().into()
-        }
-    }
-
-    fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_proj = camera.build_view_projection_matrix().into();
-    }
-}
  
 fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, shader: &wgpu::ShaderModule, bind_group_layouts: &[&wgpu::BindGroupLayout]) -> wgpu::RenderPipeline {
     let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
@@ -159,10 +116,11 @@ pub struct State {
     num_indices: u32,
     diffuse_bind_group: wgpu::BindGroup,
     diffuse_texture: texture::Texture,
-    camera: Camera,
-    camera_uniform: CameraUniform,
+    camera: camera::Camera,
+    camera_uniform: camera::CameraUniform,
     camera_uniform_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    camera_controller: camera::CameraController,
     window: Window,
 }
 
@@ -266,17 +224,17 @@ impl State {
             }
         );
 
-        let camera = Camera {
-            eye: cgmath::Point3::new(0.0, 1.0, 2.0),
-            target: cgmath::Point3::new(0.0, 0.0, 0.0),
-            up: cgmath::Vector3::unit_y(),
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
+        let camera = camera::Camera::new(
+            cgmath::Point3::new(0.0, 1.0, 2.0),
+            cgmath::Point3::new(0.0, 0.0, 0.0),
+            cgmath::Vector3::unit_y(),
+            config.width as f32 / config.height as f32,
+            45.0,
+            0.1,
+            100.0,
+        );
 
-        let mut camera_uniform = CameraUniform::new();
+        let mut camera_uniform = camera::CameraUniform::new();
         camera_uniform.update_view_proj(&camera);
 
         let camera_uniform_buffer = device.create_buffer_init(
@@ -302,7 +260,6 @@ impl State {
             ],
             label: Some("camera_bind_group_layout"),
         });
-
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &camera_bind_group_layout,
             entries: &[
@@ -313,6 +270,8 @@ impl State {
             ],
             label: Some("camera_bind_group"),
         });
+
+        let camera_controller = camera::CameraController::new(0.2);
 
         // Set up a default screen clear colour
         let clear_color = wgpu::Color {
@@ -368,6 +327,7 @@ impl State {
             camera_uniform,
             camera_uniform_buffer,
             camera_bind_group,
+            camera_controller,
             window,
         }
     }
@@ -411,12 +371,15 @@ impl State {
                 self.render_pipeline_index = (self.render_pipeline_index + 1) % self.render_pipelines.len();
                 true
             }
-            _ => false,
+            _ => self.camera_controller.process_events(event),
         }
     }
 
     fn update(&mut self) {
-        // todo!()
+        self.camera_controller.update_camera(&mut self.camera);
+        self.camera_uniform.update_view_proj(&self.camera);
+        // Despite not explicitly using a staging buffer, this is still pretty performant (apparently) https://github.com/gfx-rs/wgpu/discussions/1438#discussioncomment-345473
+        self.queue.write_buffer(&self.camera_uniform_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
