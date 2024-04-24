@@ -80,6 +80,25 @@ impl Camera {
         OPENGL_TO_WGPU_MATRIX * proj * view // cgmath is built for OpenGL, better (and might be fun) to implement this fn manually
     }
 }
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct CameraUniform {
+    view_proj: [[f32; 4]; 4],
+}
+
+impl CameraUniform {
+    fn new() -> Self {
+        use cgmath::SquareMatrix;
+        Self {
+            view_proj: cgmath::Matrix4::identity().into()
+        }
+    }
+
+    fn update_view_proj(&mut self, camera: &Camera) {
+        self.view_proj = camera.build_view_projection_matrix().into();
+    }
+}
  
 fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, shader: &wgpu::ShaderModule, bind_group_layouts: &[&wgpu::BindGroupLayout]) -> wgpu::RenderPipeline {
     let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
@@ -141,6 +160,9 @@ pub struct State {
     diffuse_bind_group: wgpu::BindGroup,
     diffuse_texture: texture::Texture,
     camera: Camera,
+    camera_uniform: CameraUniform,
+    camera_uniform_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
     window: Window,
 }
 
@@ -254,6 +276,44 @@ impl State {
             zfar: 100.0,
         };
 
+        let mut camera_uniform = CameraUniform::new();
+        camera_uniform.update_view_proj(&camera);
+
+        let camera_uniform_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Camera Buffer"),
+                contents: bytemuck::cast_slice(&[camera_uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+
+        let camera_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }
+            ],
+            label: Some("camera_bind_group_layout"),
+        });
+
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &camera_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_uniform_buffer.as_entire_binding(),
+                }
+            ],
+            label: Some("camera_bind_group"),
+        });
+
         // Set up a default screen clear colour
         let clear_color = wgpu::Color {
             r: 0.1,
@@ -272,8 +332,8 @@ impl State {
             source: wgpu::ShaderSource::Wgsl(include_str!("colourful_shader.wgsl").into()),
         });
         let render_pipelines = [
-            create_render_pipeline_with_shader(&device, &config, &default_shader, &[&texture_bind_group_layout]),
-            create_render_pipeline_with_shader(&device, &config, &colourful_shader, &[&texture_bind_group_layout]),
+            create_render_pipeline_with_shader(&device, &config, &default_shader, &[&texture_bind_group_layout, &camera_bind_group_layout]),
+            create_render_pipeline_with_shader(&device, &config, &colourful_shader, &[&texture_bind_group_layout, &camera_bind_group_layout]),
         ];
         let render_pipeline_index: usize = 0;
 
@@ -305,6 +365,9 @@ impl State {
             diffuse_bind_group,
             diffuse_texture,
             camera,
+            camera_uniform,
+            camera_uniform_buffer,
+            camera_bind_group,
             window,
         }
     }
@@ -385,6 +448,7 @@ impl State {
         });
         render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_index]);
         render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+        render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1); // Draw 3 vertices and 1 instance
