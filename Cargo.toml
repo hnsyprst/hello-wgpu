@@ -15,23 +15,31 @@ pollster = "0.3"
 bytemuck = { version = "1.12", features = [ "derive" ] }
 anyhow = "1.0"
 cgmath = "0.18"
+tobj = { version = "3.2.1", features = [ "async" ] }
 
 [dependencies.image]
 version = "0.24"
 default-features = false
 features = ["png", "jpeg"]
 
+[build-dependencies]
+anyhow = "1.0"
+fs_extra = "1.2"
+glob = "0.3"
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6" # Configures the `panic!` macro to send errors to the JS console
 console_log = "1.0" # Implements the `log` API, sends all logs to the JS console
-wgpu = { version = "0.18", features = ["webgl"]} # Using the WebGL feature, try WebGPU later
+wgpu = { version = "0.18", features = [ "webgl" ] } # Using the WebGL feature, try WebGPU later
 wasm-bindgen = "0.2" # Generates boilerplate code to tell the browser how to use this crate, exposes methods in Rust that can be used in JS and vice-versa
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = [ # Bindings for JS Web APIs
     "Document",
     "Window",
     "Element",
+    "Location",
 ]} 
+reqwest = { version = "0.11" } # Handle resource loading requests
 
 [lib]
 crate-type = ["cdylib", "rlib"]
