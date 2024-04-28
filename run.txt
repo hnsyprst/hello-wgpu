@@ -1,0 +1,4 @@
+https://github.com/mcclure/rs-hello/blob/unstable/run.txt
+
+[Windows]
+cmd.exe /c "set RUSTFLAGS=--cfg=web_sys_unstable_apis & wasm-pack.exe build --target web

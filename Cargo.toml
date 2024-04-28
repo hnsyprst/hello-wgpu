@@ -22,15 +22,16 @@ default-features = false
 features = ["png", "jpeg"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-console_error_panic_hook = "0.1.6" # Configures the `panic!` macro to send errors to the JS console
+console_error_panic_hook = "0.1.7" # Configures the `panic!` macro to send errors to the JS console
 console_log = "1.0" # Implements the `log` API, sends all logs to the JS console
-wgpu = { version = "0.18", features = ["webgl"]} # Using the WebGL feature, try WebGPU later
+wgpu = { version = "0.18" } # Using the WebGL feature, try WebGPU later
 wasm-bindgen = "0.2" # Generates boilerplate code to tell the browser how to use this crate, exposes methods in Rust that can be used in JS and vice-versa
-wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = [ # Bindings for JS Web APIs
+wasm-bindgen-futures = "0.4.34"
+web-sys = { version = "0.3.61", features = [ # Bindings for JS Web APIs
     "Document",
     "Window",
     "Element",
+    "Text",
 ]} 
 
 [lib]
