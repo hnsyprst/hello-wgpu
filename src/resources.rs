@@ -12,10 +12,10 @@ fn format_url(file_name: &str) -> reqwest::Url {
     let window = web_sys::window().unwrap();
     let location = window.location();
     let mut origin = location.origin().unwrap();
-    if !origin.ends_with("hello-wgpu") {
-        origin = format!("{}/hello-wgpu", origin);
+    if !origin.ends_with("res") {
+        origin = format!("{}/res", origin);
     }
-    let base = reqwest::Url::parse(&format!("{}/", origin)).unwrap();
+    let base = reqwest::Url::parse(&format!("{}/", origin,)).unwrap();
     base.join(file_name).unwrap()
 }
 
