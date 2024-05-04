@@ -9,12 +9,14 @@ mod resources;
 use model::Vertex;
 
 use cgmath::prelude::*;
+use wasm_bindgen_futures::js_sys::Math::random;
 use wgpu::{util::DeviceExt, Color};
 use winit::{
     event::{self, *},
     event_loop::{self, ControlFlow, EventLoop},
     window::{self, Window, WindowBuilder},
 };
+use rand::Rng;
 
 #[derive(serde::Deserialize, Debug)]
 struct Song {
@@ -68,6 +70,7 @@ impl RawInstance {
 struct Instance {
     position: cgmath::Vector3<f32>,
     rotation: cgmath::Quaternion<f32>,
+    rotation_speed: f32,
 }
 
 impl Instance {
@@ -324,6 +327,7 @@ impl State {
         let songs: Vec<Song> = resources::load_json::<Song>("coords.json").await.unwrap();
 
         const SPACE_BETWEEN: f32 = 5.0;
+        let mut rng = rand::thread_rng();
         let instances = songs.iter().map(|song| {
             // let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
             // let z = SPACE_BETWEEN * (z as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
@@ -334,7 +338,8 @@ impl State {
             } else {
                 cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
             };
-            Instance { position, rotation }
+            let rotation_speed: f32 = rng.gen_range(-0.5..0.5);
+            Instance { position, rotation, rotation_speed }
         }).collect::<Vec<_>>();
         let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -430,8 +435,9 @@ impl State {
     fn update(&mut self) {
         self.instances = self.instances.iter().map(|instance| {
             let position = instance.position;
-            let rotation = instance.rotation * cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(1.0));
-            Instance { position, rotation }
+            let rotation_speed = instance.rotation_speed;
+            let rotation = instance.rotation * cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(rotation_speed));
+            Instance { position, rotation, rotation_speed }
 
         }).collect::<Vec<_>>();
         let instance_data = self.instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
