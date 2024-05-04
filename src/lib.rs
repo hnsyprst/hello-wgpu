@@ -396,6 +396,7 @@ impl State {
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         // Configures `self.surface` to match `new_size`.
         if new_size.width > 0 && new_size.height > 0 { // height or width being 0 may cause crashes
+            self.window.set_inner_size(new_size);
             self.size = new_size;
             self.config.width = new_size.width;
             self.config.height = new_size.height;
@@ -518,27 +519,29 @@ pub async fn run() {
     }
     
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let mut builder = WindowBuilder::new();
+    let mut width = 1920;
+    let mut height = 1080;
 
     // Create window in DOM if targeting wasm
     #[cfg(target_arch = "wasm32")]
     {
-        // Winit prevents sizing with CSS, so we have to set
-        // the size manually when on web.
-        use winit::dpi::PhysicalSize;
-        window.set_inner_size(PhysicalSize::new(450, 400));
-        
-        use winit::platform::web::WindowExtWebSys;
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| {
-                let dst = doc.get_element_by_id("wasm-example")?;
-                let canvas = web_sys::Element::from(window.canvas());
-                dst.append_child(&canvas).ok()?;
-                Some(())
-            })
-            .expect("Couldn't append canvas to document body.");
+        use wasm_bindgen::JsCast;
+            use winit::platform::web::WindowBuilderExtWebSys;
+            let canvas = web_sys::window()
+                .unwrap()
+                .document()
+                .unwrap()
+                .get_element_by_id("canvas")
+                .unwrap()
+                .dyn_into::<web_sys::HtmlCanvasElement>()
+                .unwrap();
+            width = canvas.client_width();
+            height = canvas.client_height();
+            builder = builder.with_canvas(Some(canvas));
     }
+    builder = builder.with_title("main-canvas");
+    let window = builder.with_inner_size(winit::dpi::LogicalSize::new(width, height)).build(&event_loop).unwrap();
 
     let mut state =  State::new(window).await;
 
@@ -561,10 +564,9 @@ pub async fn run() {
                         *control_flow = ControlFlow::Exit;
                     }
                     WindowEvent::Resized(physical_size) => {
+                        log::info!("Resized to {:?}", physical_size);
                         state.resize(*physical_size);
-                    }
-                    WindowEvent::ScaleFactorChanged{ new_inner_size, .. } => {
-                        state.resize(**new_inner_size);
+                        state.window().request_redraw();
                     }
                     _ => {}
                 }
