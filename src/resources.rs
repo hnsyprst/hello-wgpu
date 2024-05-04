@@ -1,6 +1,10 @@
 // Serve resources in wasm
 
-use std::io::{BufReader, Cursor};
+use std::{
+    io::BufReader,
+    io::Cursor,
+    fs,
+};
 
 use cfg_if::cfg_if;
 use wgpu::util::DeviceExt;
@@ -31,7 +35,7 @@ pub async fn load_string(file_name: &str) -> anyhow::Result<String> {
             let path = std::path::Path::new(env!("OUT_DIR"))
                 .join("res")
                 .join(file_name);
-            let txt = std::fs::read_to_string(path)?;
+            let txt = fs::read_to_string(path)?;
         }
     }
 
@@ -51,11 +55,35 @@ pub async fn load_binary(file_name: &str) -> anyhow::Result<Vec<u8>> {
             let path = std::path::Path::new(env!("OUT_DIR"))
                 .join("res")
                 .join(file_name);
-            let data = std::fs::read(path)?;
+            let data = fs::read(path)?;
         }
     }
 
     Ok(data)
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct Response<T> {
+    data: Vec<T>,
+}
+
+pub async fn load_json<T>(file_name: &str) -> anyhow::Result<Vec<T>> where T: serde::de::DeserializeOwned {
+    cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            let url = format_url(file_name);
+            let data: Response<T> = reqwest::get(url)
+                .await?
+                .json::<Response<T>>()
+                .await?;
+        } else {
+            let path = std::path::Path::new(env!("OUT_DIR"))
+                .join("res")
+                .join(file_name);
+            let data: Response<T> = serde_json::from_reader(BufReader::new(fs::File::open(path)?))?;
+        }
+    }
+
+    Ok(data.data)
 }
 
 // TODO: Default texture if load texture_fails
