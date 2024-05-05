@@ -1,2 +1,6 @@
+.vscode
 /target
 /web
+
+# add this back later!
+/res/coords.json
