@@ -1,16 +1,20 @@
+use egui_wgpu::renderer::ScreenDescriptor;
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
+#[cfg(target_arch="wasm32")]
+use wasm_bindgen_futures::js_sys::Math::random;
 
 mod camera;
 mod texture;
 mod model;
 mod resources;
+mod gui;
 
 use model::Vertex;
 
 use cgmath::prelude::*;
-use wasm_bindgen_futures::js_sys::Math::random;
-use wgpu::{util::DeviceExt, Color};
+use egui::{Align2, Context};
+use wgpu::{util::DeviceExt, Color, CommandEncoder};
 use winit::{
     event::{self, *},
     event_loop::{self, ControlFlow, EventLoop},
@@ -158,6 +162,7 @@ pub struct State {
     instance_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
     obj_model: model::Model,
+    egui_renderer: gui::EguiRenderer,
     window: Window,
 }
 
@@ -348,6 +353,15 @@ impl State {
                 usage: wgpu::BufferUsages::VERTEX,
         });
 
+        // Set up the GUI
+        let mut egui_renderer = gui::EguiRenderer::new(
+            &device,
+            config.format,
+            None,
+            1,
+            &window,
+        );
+
         // Set up the render pipeline
         let depth_texture = texture::Texture::create_depth_texture(&device, &config, "depth_texture");
         let default_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
@@ -384,6 +398,7 @@ impl State {
             instance_buffer,
             depth_texture,
             obj_model,
+            egui_renderer,
             window,
         }
     }
@@ -396,7 +411,7 @@ impl State {
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         // Configures `self.surface` to match `new_size`.
         if new_size.width > 0 && new_size.height > 0 { // height or width being 0 may cause crashes
-            self.window.set_inner_size(new_size);
+            // self.window.set_inner_size(new_size);
             self.size = new_size;
             self.config.width = new_size.width;
             self.config.height = new_size.height;
@@ -406,6 +421,7 @@ impl State {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
+        self.egui_renderer.handle_input(&event); // FIXME: This is being called every input (not great!) but im out of time atm
         // Returns a bool to indicate whether `event` has been fully processed.
         // May be used to instruct an event loop to not process `event` any further.
         match event {
@@ -429,7 +445,9 @@ impl State {
                 self.render_pipeline_index = (self.render_pipeline_index + 1) % self.render_pipelines.len();
                 true
             }
-            _ => self.camera_controller.process_events(event),
+            _ => {
+                self.camera_controller.process_events(event)
+            }
         }
     }
 
@@ -497,6 +515,37 @@ impl State {
         let material = &self.obj_model.materials[mesh.material];
         render_pass.draw_mesh_instanced(mesh, material, 0..self.instances.len() as u32, &self.camera_bind_group);
         drop(render_pass); // Need to drop `render_pass` to release the mutable borrow of `encoder` so we can call `encoder.finish()`
+        
+        let screen_descriptor = ScreenDescriptor {
+            size_in_pixels: [self.config.width, self.config.height],
+            pixels_per_point: self.window.scale_factor() as f32,
+        };
+
+        self.egui_renderer.draw(
+            &self.device,
+            &self.queue,
+            &mut encoder,
+            &self.window,
+            &view,
+            screen_descriptor,
+            |ui| {
+                egui::Window::new("Controls")
+                    // .vscroll(true)
+                    .default_open(true)
+                    .max_width(1000.0)
+                    .max_height(800.0)
+                    .default_width(800.0)
+                    .resizable(true)
+                    .anchor(Align2::CENTER_TOP, [0.0, 0.0])
+                    .show(&ui, |mut ui| {
+                        if ui.add(egui::Button::new("Click me")).clicked() {
+                            println!("PRESSED")
+                        }
+                        ui.label("Slider");
+                        ui.end_row();
+                    });
+            },
+        );
 
         // `Queue.submit()` will accept anything that implements `IntoIter`, so we wrap `encoder.finish()` up in `std::iter::once`
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -520,8 +569,6 @@ pub async fn run() {
     
     let event_loop = EventLoop::new();
     let mut builder = WindowBuilder::new();
-    let mut width = 1920;
-    let mut height = 1080;
 
     // Create window in DOM if targeting wasm
     #[cfg(target_arch = "wasm32")]
@@ -536,12 +583,12 @@ pub async fn run() {
                 .unwrap()
                 .dyn_into::<web_sys::HtmlCanvasElement>()
                 .unwrap();
-            width = canvas.client_width();
-            height = canvas.client_height();
-            builder = builder.with_canvas(Some(canvas));
+            let width = canvas.client_width();
+            let height = canvas.client_height();
+            builder = builder.with_inner_size(winit::dpi::PhysicalSize::new(width, height)).with_canvas(Some(canvas));
     }
     builder = builder.with_title("main-canvas");
-    let window = builder.with_inner_size(winit::dpi::LogicalSize::new(width, height)).build(&event_loop).unwrap();
+    let window = builder.build(&event_loop).unwrap();
 
     let mut state =  State::new(window).await;
 
@@ -566,10 +613,12 @@ pub async fn run() {
                     WindowEvent::Resized(physical_size) => {
                         log::info!("Resized to {:?}", physical_size);
                         state.resize(*physical_size);
-                        state.window().request_redraw();
+                    }
+                    WindowEvent::ScaleFactorChanged{ new_inner_size, .. } => {
+                        state.resize(**new_inner_size);
                     }
                     _ => {}
-                }
+                };
             }
             Event::RedrawRequested(window_id) if window_id == state.window().id() => {
                 state.update();
@@ -588,5 +637,6 @@ pub async fn run() {
                 state.window().request_redraw();
             }
             _ => {}
-        });
+        }
+    );
 }
