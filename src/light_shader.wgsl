@@ -1,6 +1,7 @@
 // Vertex shader
 
 struct CameraUniform {
+    view_pos: vec4<f32>,
     view_proj: mat4x4<f32>,
 };
 // `group` refers to the index of the bind group passed to `render_pipeline_layout we want to access here 
