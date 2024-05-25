@@ -608,22 +608,20 @@ impl State {
         });
         
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-        let mesh = &self.obj_model.meshes[0];
 
         use model::DrawLight;
         render_pass.set_pipeline(&self.light_render_pipeline);
-        render_pass.draw_light_mesh(
-            mesh,
+        render_pass.draw_light_model(
+            &self.obj_model,
             &self.camera_bind_group,
             &self.light_bind_group,
         );
 
         use model::DrawModel;
         render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_index]);
-        let material = &self.obj_model.materials[mesh.material];
-        render_pass.draw_mesh_instanced(
-            mesh,
-            material, 0..self.instances.len() as u32,
+        render_pass.draw_model_instanced(
+            &self.obj_model,
+            0..self.instances.len() as u32,
             &self.camera_bind_group,
             &self.light_bind_group,
         );
