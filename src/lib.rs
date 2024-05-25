@@ -187,7 +187,6 @@ pub struct State {
     clear_color: wgpu::Color,
     render_pipelines: [wgpu::RenderPipeline; 2],
     render_pipeline_index: usize,
-    diffuse_texture: texture::Texture,
     camera: camera::Camera,
     camera_uniform: camera::CameraUniform,
     camera_uniform_buffer: wgpu::Buffer,
@@ -262,10 +261,6 @@ impl State {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
-
-        // Create a texture and load it
-        let diffuse_bytes = include_bytes!("tex.png");
-        let diffuse_texture = texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "tex.png").unwrap(); // TODO: Use a default texture with `unwrap_or` or some other `Err` handling
         
         let texture_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { 
             label: Some("texture_bind_group_layout"),
@@ -477,7 +472,6 @@ impl State {
             clear_color,
             render_pipelines,
             render_pipeline_index,
-            diffuse_texture,
             camera,
             camera_uniform,
             camera_uniform_buffer,
