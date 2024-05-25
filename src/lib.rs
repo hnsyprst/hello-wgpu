@@ -85,10 +85,28 @@ impl Instance {
     }
 }
 
-const NUM_INSTANCES_PER_ROW: u32 = 10;
-const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(NUM_INSTANCES_PER_ROW as f32 * 0.5, 0.0, NUM_INSTANCES_PER_ROW as f32 * 0.5);
- 
-fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, shader: &wgpu::ShaderModule, bind_group_layouts: &[&wgpu::BindGroupLayout]) -> wgpu::RenderPipeline {
+
+// TODO: Might be better to impl a constructor for uniforms in future so user doesn't have to think about stupid padding (cool)
+// might also make it easier to forget about stupid padding (sad)
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct LightUniform {
+    position: [f32; 3],
+    // Due to uniforms requiring 16 byte (4 float) spacing, we need to use a padding field here
+    _padding: u32,
+    color: [f32; 3],
+    // Due to uniforms requiring 16 byte (4 float) spacing, we need to use a padding field here
+    _padding2: u32,
+}
+
+// TODO: Add labels
+fn create_render_pipeline_with_shader(
+    device: &wgpu::Device,
+    config: &wgpu::SurfaceConfiguration,
+    shader: &wgpu::ShaderModule,
+    vertex_layouts: &[wgpu::VertexBufferLayout],
+    bind_group_layouts: &[&wgpu::BindGroupLayout]
+) -> wgpu::RenderPipeline {
     let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
         label: Some("Render Pipeline Layout"),
         bind_group_layouts: bind_group_layouts,
@@ -100,10 +118,7 @@ fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::Surf
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: "vs_main",
-            buffers: &[
-                model::ModelVertex::describe(),
-                RawInstance::describe(),
-            ],
+            buffers: vertex_layouts,
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -126,6 +141,7 @@ fn create_render_pipeline_with_shader(device: &wgpu::Device, config: &wgpu::Surf
             // Requires Features::CONSERVATIVE_RASTERIZATION
             conservative: false,
         },
+        // TODO: May need tgo be changed, see https://sotrh.github.io/learn-wgpu/intermediate/tutorial10-lighting/#seeing-the-light
         depth_stencil: Some(wgpu::DepthStencilState {
             format: texture::Texture::DEPTH_FORMAT,
             depth_write_enabled: true,
@@ -162,6 +178,10 @@ pub struct State {
     instance_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
     obj_model: model::Model,
+    light_uniform: LightUniform,
+    light_uniform_buffer: wgpu::Buffer,
+    light_bind_group: wgpu::BindGroup,
+    light_render_pipeline: wgpu::RenderPipeline,
     egui_renderer: gui::EguiRenderer,
     window: Window,
 }
@@ -353,6 +373,43 @@ impl State {
                 usage: wgpu::BufferUsages::VERTEX,
         });
 
+        // Set up lighting
+        let light_uniform = LightUniform {
+            position: [10.0, 10.0, 10.0],
+            _padding: 0,
+            color: [1.0, 1.0, 1.0],
+            _padding2: 0,
+        };
+        let light_uniform_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Light Buffer"),
+                contents: bytemuck::cast_slice(&[light_uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+
+        let light_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+            label: None,
+        });
+        let light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &light_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: light_uniform_buffer.as_entire_binding(),
+            }],
+            label: None,
+        });
+
         // Set up the GUI
         let mut egui_renderer = gui::EguiRenderer::new(
             &device,
@@ -364,19 +421,31 @@ impl State {
 
         // Set up the render pipeline
         let depth_texture = texture::Texture::create_depth_texture(&device, &config, "depth_texture");
-        let default_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
-            label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-        });
-        let colourful_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
-            label: Some("Colourful Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("colourful_shader.wgsl").into()),
-        });
-        let render_pipelines = [
-            create_render_pipeline_with_shader(&device, &config, &default_shader, &[&texture_bind_group_layout, &camera_bind_group_layout]),
-            create_render_pipeline_with_shader(&device, &config, &colourful_shader, &[&texture_bind_group_layout, &camera_bind_group_layout]),
-        ];
+        let vertex_layouts = [model::ModelVertex::describe(), RawInstance::describe()];
+
         let render_pipeline_index: usize = 0;
+        let render_pipelines = {
+            let bind_group_layouts = [&texture_bind_group_layout, &camera_bind_group_layout, &light_bind_group_layout];
+            let default_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
+                label: Some("Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+            });
+            let colourful_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
+                label: Some("Colourful Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("colourful_shader.wgsl").into()),
+            });
+            [
+                create_render_pipeline_with_shader(&device, &config, &default_shader, &vertex_layouts, &bind_group_layouts),
+                create_render_pipeline_with_shader(&device, &config, &colourful_shader, &vertex_layouts, &bind_group_layouts),
+            ]
+        };
+        let light_render_pipeline = {
+            let light_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
+                label: Some("Light Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("light_shader.wgsl").into()),
+            });
+            create_render_pipeline_with_shader(&device, &config, &light_shader, &[model::ModelVertex::describe()], &[&camera_bind_group_layout, &light_bind_group_layout])
+        };
 
         Self {
             surface,
@@ -398,6 +467,10 @@ impl State {
             instance_buffer,
             depth_texture,
             obj_model,
+            light_uniform,
+            light_uniform_buffer,
+            light_bind_group,
+            light_render_pipeline,
             egui_renderer,
             window,
         }
@@ -452,6 +525,7 @@ impl State {
     }
 
     fn update(&mut self) {
+        // Move instances
         self.instances = self.instances.iter().map(|instance| {
             let position = instance.position;
             let rotation_speed = instance.rotation_speed;
@@ -465,6 +539,13 @@ impl State {
                 contents: bytemuck::cast_slice(&instance_data),
                 usage: wgpu::BufferUsages::VERTEX,
         });
+        // Move lights
+        let light_position: cgmath::Vector3<_> = self.light_uniform.position.into();
+        self.light_uniform.position = (
+            cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(0.1)) * light_position
+        ).into();
+        self.queue.write_buffer(&self.light_uniform_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
+        // Move camera
         self.camera_controller.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
         // Despite not explicitly using a staging buffer, this is still pretty performant (apparently) https://github.com/gfx-rs/wgpu/discussions/1438#discussioncomment-345473
@@ -505,15 +586,27 @@ impl State {
             occlusion_query_set: None,
             timestamp_writes: None,
         });
+        
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-        render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_index]);
-        render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
-        render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+        let mesh = &self.obj_model.meshes[0];
+
+        use model::DrawLight;
+        render_pass.set_pipeline(&self.light_render_pipeline);
+        render_pass.draw_light_mesh(
+            mesh,
+            &self.camera_bind_group,
+            &self.light_bind_group,
+        );
 
         use model::DrawModel;
-        let mesh = &self.obj_model.meshes[0];
+        render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_index]);
         let material = &self.obj_model.materials[mesh.material];
-        render_pass.draw_mesh_instanced(mesh, material, 0..self.instances.len() as u32, &self.camera_bind_group);
+        render_pass.draw_mesh_instanced(
+            mesh,
+            material, 0..self.instances.len() as u32,
+            &self.camera_bind_group,
+            &self.light_bind_group,
+        );
         drop(render_pass); // Need to drop `render_pass` to release the mutable borrow of `encoder` so we can call `encoder.finish()`
         
         let screen_descriptor = ScreenDescriptor {
