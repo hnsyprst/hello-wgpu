@@ -608,12 +608,11 @@ impl State {
         });
         
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-        let mesh = &self.obj_model.meshes[0];
 
         use model::DrawLight;
         render_pass.set_pipeline(&self.light_render_pipeline);
-        render_pass.draw_light_mesh(
-            mesh,
+        render_pass.draw_light_model(
+            &self.obj_model,
             &self.camera_bind_group,
             &self.light_bind_group,
         );
