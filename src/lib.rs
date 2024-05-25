@@ -620,10 +620,9 @@ impl State {
 
         use model::DrawModel;
         render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_index]);
-        let material = &self.obj_model.materials[mesh.material];
-        render_pass.draw_mesh_instanced(
-            mesh,
-            material, 0..self.instances.len() as u32,
+        render_pass.draw_model_instanced(
+            &self.obj_model,
+            0..self.instances.len() as u32,
             &self.camera_bind_group,
             &self.light_bind_group,
         );
