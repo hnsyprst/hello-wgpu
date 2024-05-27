@@ -1,6 +1,7 @@
 .vscode
 /target
 /web
+/todo.md
 
 # add this back later!
 /res/coords.json
