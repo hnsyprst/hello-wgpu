@@ -7,10 +7,12 @@ use wasm_bindgen_futures::js_sys::Math::random;
 mod camera;
 mod gui;
 mod instance;
+mod light;
 mod model;
 mod resources;
 mod texture;
 
+use light::LightUniform;
 use instance::Instance;
 use model::Vertex;
 
@@ -31,20 +33,6 @@ struct Song {
     x: f32,
     y: f32,
     z: f32,
-}
-
-
-// TODO: Might be better to impl a constructor for uniforms in future so user doesn't have to think about stupid padding (cool)
-// might also make it easier to forget about stupid padding (sad)
-#[repr(C)]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct LightUniform {
-    position: [f32; 3],
-    // Due to uniforms requiring 16 byte (4 float) spacing, we need to use a padding field here
-    _padding: u32,
-    color: [f32; 3],
-    // Due to uniforms requiring 16 byte (4 float) spacing, we need to use a padding field here
-    _padding2: u32,
 }
 
 // TODO: Add labels
