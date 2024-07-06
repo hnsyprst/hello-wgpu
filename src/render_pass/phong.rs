@@ -3,7 +3,7 @@ use std::{
     iter,
 };
 use crate::{
-    app::AppData, camera::{
+    app::{self, AppData}, camera::{
         self,
         Camera,
         CameraUniform,
@@ -16,6 +16,8 @@ use wgpu::{util::DeviceExt, BindGroupLayout, Device, Queue, Surface};
 
 pub struct PhongPass {
     pub camera_uniform: CameraUniform,
+    camera_uniform_buffer: wgpu::Buffer,
+    light_uniform_buffer: wgpu::Buffer,
     pub global_bind_group_layout: wgpu::BindGroupLayout,
     pub global_bind_group: wgpu::BindGroup,
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
@@ -161,6 +163,8 @@ impl PhongPass {
 
         Self {
             camera_uniform,
+            camera_uniform_buffer,
+            light_uniform_buffer,
             global_bind_group_layout,
             global_bind_group,
             texture_bind_group_layout,
@@ -187,8 +191,10 @@ impl RenderPass for PhongPass {
             a: 1.0,
         };
 
+        app_data.queue.write_buffer(&self.camera_uniform_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
+
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
+            label: Some("Phong Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view, // Render to the view created above (the output texture)
                 resolve_target: None, // The same as `view` unless multisampling is enabled
@@ -217,7 +223,7 @@ impl RenderPass for PhongPass {
             let create_instance_buffer = || {
                 let instance_data = object.instances.iter().map(instance::Instance::to_raw).collect::<Vec<_>>();
                 app_data.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Instance Buffer"),
+                        label: Some("Phong Instance Buffer"),
                         contents: bytemuck::cast_slice(&instance_data),
                         usage: wgpu::BufferUsages::VERTEX,
                 })
@@ -230,7 +236,6 @@ impl RenderPass for PhongPass {
 
         for (object_idx, object) in objects.iter().enumerate() {
             render_pass.set_vertex_buffer(1, self.instance_buffers[&object_idx].slice(..));
-
             render_pass.draw_model_instanced(
                 &object.model,
                 0..object.instances.len() as u32,
