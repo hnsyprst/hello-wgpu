@@ -11,7 +11,6 @@ pub type WindowEventFn<T> = fn(app_data: &AppData, state: &mut T, window_event: 
 pub type ResizeFn<T> = fn(app_data: &AppData, state: &mut T, size: (u32, u32));
 pub type UpdateFn<T> = fn(app_data: &AppData, state: &mut T);
 pub type RenderFn<T> = fn(app_data: &AppData, state: &mut T, view: wgpu::TextureView, encoder: wgpu::CommandEncoder);
-pub type InitialisationFn<T> = fn(app_data: &AppData, state: &mut T) -> Vec<RenderPipeline>;
 
 pub struct AppData {
     pub device: wgpu::Device,
@@ -19,8 +18,6 @@ pub struct AppData {
     pub config: wgpu::SurfaceConfiguration,
     
     pub size: winit::dpi::PhysicalSize<u32>,
-    
-    pub render_pipelines: Vec<wgpu::RenderPipeline>,
 
     pub surface: wgpu::Surface,
 }
@@ -89,7 +86,6 @@ impl AppData {
             queue,
             config,
             size,
-            render_pipelines: vec![],
             surface,
         }
     }
@@ -103,7 +99,6 @@ pub struct App<T: 'static> {
     resize_fn: ResizeFn<T>, // Called on every ScaleFactorChaanged and Resized WindowEvents
     update_fn: UpdateFn<T>, // Called before RenderFn every frame
     render_fn: RenderFn<T>, // Called after UpdateFn every frame
-    initialisation_fn: InitialisationFn<T>, // Called at the start of the application. Must return a vector of RenderPipelines
 }
 
 impl<T: 'static> App<T> {
@@ -114,7 +109,6 @@ impl<T: 'static> App<T> {
         resize_fn: ResizeFn<T>,
         update_fn: UpdateFn<T>,
         render_fn: RenderFn<T>,
-        initialisation_fn: InitialisationFn<T>,
     ) -> Self {
         App {
             state,
@@ -123,14 +117,7 @@ impl<T: 'static> App<T> {
             resize_fn,
             update_fn,
             render_fn,
-            initialisation_fn,
         }
-    }
-
-    fn init(
-        &mut self,
-    ) {
-        self.app_data.render_pipelines = (self.initialisation_fn)(&self.app_data, &mut self.state);
     }
 
     fn resize(
@@ -174,8 +161,6 @@ impl<T: 'static> App<T> {
         window: winit::window::Window,
         event_loop: EventLoop<()>,
     ) {
-        self.init();
-
         window.set_visible(true);
 
         event_loop.run(move |event, _, control_flow| match event {
@@ -261,7 +246,6 @@ pub async fn run_app<T: 'static>(
     resize_fn: ResizeFn<T>,
     update_fn: UpdateFn<T>,
     render_fn: RenderFn<T>,
-    initialisation_fn: InitialisationFn<T>,
 ){
     let event_loop = EventLoop::new();
     let window = create_window(title, &event_loop);
@@ -275,7 +259,6 @@ pub async fn run_app<T: 'static>(
         resize_fn,
         update_fn,
         render_fn,
-        initialisation_fn
     ).await;
     app.run(window, event_loop);
 }
