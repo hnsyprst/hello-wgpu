@@ -168,11 +168,11 @@ fn update(
     }
 
     // Move lights
-    // let light_position: cgmath::Vector3<_> = state.light_uniform.position.into();
-    // state.light_uniform.position = (
-    //     cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(0.1)) * light_position
-    // ).into();
-    // app_data.queue.write_buffer(&state.light_uniform_buffer, 0, bytemuck::cast_slice(&[state.light_uniform]));
+    let light_position: cgmath::Vector3<_> = state.phong_pass.light_uniform.position.into();
+    state.phong_pass.light_uniform.position = (
+        cgmath::Quaternion::from_axis_angle((0.0, 1.0, 0.0).into(), cgmath::Deg(5.0)) * light_position
+    ).into();
+
     // Move camera
     state.camera_controller.update_camera(&mut state.camera);
     state.phong_pass.camera_uniform.update_view_proj(&state.camera);
