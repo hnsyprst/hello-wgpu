@@ -214,16 +214,18 @@ impl RenderPass for PhongPass {
         render_pass.set_pipeline(&self.render_pipeline);
 
         for (object_idx, object) in objects.iter().enumerate() {
+            let create_instance_buffer = || {
+                let instance_data = object.instances.iter().map(instance::Instance::to_raw).collect::<Vec<_>>();
+                app_data.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Instance Buffer"),
+                        contents: bytemuck::cast_slice(&instance_data),
+                        usage: wgpu::BufferUsages::VERTEX,
+                })
+            };
             self.instance_buffers
                 .entry(object_idx)
-                .or_insert_with(|| {
-                    let instance_data = object.instances.iter().map(instance::Instance::to_raw).collect::<Vec<_>>();
-                    app_data.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Insatance Buffer"),
-                            contents: bytemuck::cast_slice(&instance_data),
-                            usage: wgpu::BufferUsages::VERTEX,
-                    })
-                });
+                .and_modify(|value| {*value = create_instance_buffer()})
+                .or_insert_with(create_instance_buffer);
         }
 
         for (object_idx, object) in objects.iter().enumerate() {

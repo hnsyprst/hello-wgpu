@@ -158,18 +158,14 @@ fn update(
     state: &mut State,
 ) {
     // Move instances
-    // state.instances = state.instances.iter().map(|instance| {
-    //     let position = instance.position;
-    //     let rotation_speed = instance.rotation_speed;
-    //     let rotation = instance.rotation * cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(rotation_speed));
-    //     Instance { position, rotation, rotation_speed }
-    // }).collect::<Vec<_>>();
-    // let instance_data = state.instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
-    // state.instance_buffer = app_data.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-    //         label: Some("Insatance Buffer"),
-    //         contents: bytemuck::cast_slice(&instance_data),
-    //         usage: wgpu::BufferUsages::VERTEX,
-    // });
+    for object in state.objects.iter_mut() {
+        object.instances = object.instances.iter().map(|instance| {
+            let position = instance.position;
+            let rotation_speed = instance.rotation_speed;
+            let rotation = instance.rotation * cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(rotation_speed));
+            Instance { position, rotation, rotation_speed }
+        }).collect::<Vec<_>>();
+    }
 
     // Move lights
     // let light_position: cgmath::Vector3<_> = state.light_uniform.position.into();
