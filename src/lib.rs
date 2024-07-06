@@ -83,14 +83,15 @@ impl State {
 
         let phong_pass = render_pass::phong::PhongPass::new(&app_data.device, &app_data.queue, &app_data.config, &camera);
 
-        // Load model
-        let model = resources::load_model("cube.obj", &app_data.device, &app_data.queue, &phong_pass.texture_bind_group_layout).await.unwrap();
+        // Load models
+        let cube_model = resources::load_model("cube.obj", &app_data.device, &app_data.queue, &phong_pass.texture_bind_group_layout).await.unwrap();
+        let ferris_model = resources::load_model("ferris.obj", &app_data.device, &app_data.queue, &phong_pass.texture_bind_group_layout).await.unwrap();
         // Set up instances
         // Note: if new instances are added at runtime, both `instance_buffer` and `camera_bind_group` must be recreated
         let songs: Vec<Song> = resources::load_json::<Song>("coords.json").await.unwrap();
         const SPACE_BETWEEN: f32 = 5.0;
         let mut rng = rand::thread_rng();
-        let instances = songs.iter().map(|song| {
+        let cube_instances = songs.iter().map(|song| {
             // let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
             // let z = SPACE_BETWEEN * (z as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
 
@@ -103,7 +104,20 @@ impl State {
             let rotation_speed: f32 = rng.gen_range(-0.5..0.5);
             Instance { position, rotation, rotation_speed }
         }).collect::<Vec<_>>();
-        let objects = vec![object::Object{model, instances}];
+        let ferris_instance = vec![{
+            let position = cgmath::Vector3 { x: 0.0, y: 0.0, z: 0.0 };
+            let rotation = if position.is_zero() {
+                cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
+            } else {
+                cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0))
+            };
+            let rotation_speed: f32 = rng.gen_range(-0.5..0.5);
+            Instance { position, rotation, rotation_speed }
+        }];
+        let objects = vec![
+            object::Object{ model: cube_model, instances: cube_instances },
+            object::Object{ model: ferris_model, instances: ferris_instance },
+        ];
 
         Self {
             phong_pass,
