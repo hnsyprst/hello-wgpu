@@ -17,6 +17,7 @@ use wgpu::{util::DeviceExt, BindGroupLayout, Device, Queue, Surface};
 pub struct PhongPass {
     pub camera_uniform: CameraUniform,
     camera_uniform_buffer: wgpu::Buffer,
+    pub light_uniform: LightUniform,
     light_uniform_buffer: wgpu::Buffer,
     pub global_bind_group_layout: wgpu::BindGroupLayout,
     pub global_bind_group: wgpu::BindGroup,
@@ -164,6 +165,7 @@ impl PhongPass {
         Self {
             camera_uniform,
             camera_uniform_buffer,
+            light_uniform,
             light_uniform_buffer,
             global_bind_group_layout,
             global_bind_group,
@@ -192,6 +194,7 @@ impl RenderPass for PhongPass {
         };
 
         app_data.queue.write_buffer(&self.camera_uniform_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
+        app_data.queue.write_buffer(&self.light_uniform_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Phong Render Pass"),
