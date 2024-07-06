@@ -15,14 +15,14 @@ struct CameraUniform {
     view_proj: mat4x4<f32>,
 };
 // `group` refers to the index of the bind group passed to `render_pipeline_layout we want to access here 
-@group(1) @binding(0)
+@group(0) @binding(0)
 var<uniform> camera: CameraUniform;
 
 struct LightUniform {
     position: vec3<f32>,
     color: vec3<f32>,
 };
-@group(2) @binding(0)
+@group(0) @binding(1)
 var<uniform> light: LightUniform;
 
 struct VertexInput {
@@ -84,13 +84,13 @@ fn vs_main(
 // Fragment shader
 
 // uniforms
-@group(0) @binding(0)
+@group(1) @binding(0)
 var t_diffuse: texture_2d<f32>;
-@group(0) @binding(1)
+@group(1) @binding(1)
 var s_diffuse: sampler;
-@group(0) @binding(2)
+@group(1) @binding(2)
 var t_normal: texture_2d<f32>;
-@group(0) @binding(3)
+@group(1) @binding(3)
 var s_normal: sampler;
 
 @fragment
