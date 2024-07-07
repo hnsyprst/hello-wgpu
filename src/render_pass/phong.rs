@@ -181,10 +181,11 @@ impl RenderPass for PhongPass {
     fn draw(
         &mut self,
         app_data: &AppData,
-        view: wgpu::TextureView,
+        view: &wgpu::TextureView,
         mut encoder: wgpu::CommandEncoder,
         objects: &Vec<Object>,
-    ) -> Result<(), wgpu::SurfaceError> {
+        depth_texture: Option<&Texture>,
+    ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
         // Create a `RenderPass` to clear and render the frame
         let clear_color = wgpu::Color {
             r: 0.1,
@@ -199,7 +200,7 @@ impl RenderPass for PhongPass {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Phong Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view, // Render to the view created above (the output texture)
+                view: view, // Render to the view created above (the output texture)
                 resolve_target: None, // The same as `view` unless multisampling is enabled
                 ops: wgpu::Operations {
                     // Load tells wgpu what to do with colours stored from the previous frame (here we're just clearing them to a specified colour)
@@ -253,9 +254,6 @@ impl RenderPass for PhongPass {
         //     pixels_per_point: self.window.scale_factor() as f32, // FIXME
         // };
 
-        // `Queue.submit()` will accept anything that implements `IntoIter`, so we wrap `encoder.finish()` up in `std::iter::once`
-        app_data.queue.submit(std::iter::once(encoder.finish()));
-
-        Ok(())
+        Ok(encoder)
     }
 }
