@@ -1,13 +1,12 @@
 use std::sync::Arc;
 use log::{debug, error, log_enabled, info, Level};
 
-use wgpu::RenderPipeline;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::{
-    event::{self, *},
-    event_loop::{self, ControlFlow, EventLoop},
-    window::{self, Window, WindowBuilder},
+    event::Event,
+    event_loop::EventLoop,
+    window::WindowBuilder,
 };
 
 pub type WindowEventFn<T> = fn(app_data: &AppData, state: &mut T, window_event: &WindowEvent);

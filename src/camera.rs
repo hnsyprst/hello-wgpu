@@ -1,6 +1,5 @@
 use winit::event::{ElementState, KeyEvent, WindowEvent};
-use winit::keyboard::{self, PhysicalKey, KeyCode};
-use wgpu::util::DeviceExt;
+use winit::keyboard::{PhysicalKey, KeyCode};
 use cgmath;
 
 #[repr(C)]
