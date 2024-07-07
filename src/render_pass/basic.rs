@@ -21,7 +21,6 @@ pub struct BasicPass {
     light_uniform_buffer: wgpu::Buffer,
     pub global_bind_group_layout: wgpu::BindGroupLayout,
     pub global_bind_group: wgpu::BindGroup,
-    pub depth_texture: Texture,
     pub render_pipeline: wgpu::RenderPipeline,
     pub instance_buffers: HashMap<usize, wgpu::Buffer>,
 }
@@ -155,7 +154,6 @@ impl BasicPass {
             multiview: None,
         });
 
-        let depth_texture = Texture::create_depth_texture(&device, &config, "Basic Depth Texture");
         let instance_buffers = HashMap::new();
 
         Self {
@@ -165,7 +163,6 @@ impl BasicPass {
             light_uniform_buffer,
             global_bind_group_layout,
             global_bind_group,
-            depth_texture,
             render_pipeline,
             instance_buffers,
         }
@@ -206,7 +203,7 @@ impl RenderPass for BasicPass {
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &depth_texture.or(Some(&self.depth_texture)).unwrap().view,
+                view: &depth_texture.unwrap().view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
@@ -243,12 +240,6 @@ impl RenderPass for BasicPass {
         }
         
         drop(render_pass); // Need to drop `render_pass` to release the mutable borrow of `encoder` so we can call `encoder.finish()`
-        
-        // let screen_descriptor = ScreenDescriptor {
-        //     size_in_pixels: [app_data.config.width, app_data.config.height],
-        //     pixels_per_point: self.window.scale_factor() as f32, // FIXME
-        // };
-
         Ok(encoder)
     }
 }

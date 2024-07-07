@@ -22,7 +22,6 @@ pub struct PhongPass {
     pub global_bind_group_layout: wgpu::BindGroupLayout,
     pub global_bind_group: wgpu::BindGroup,
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
-    pub depth_texture: Texture,
     pub render_pipeline: wgpu::RenderPipeline,
     pub instance_buffers: HashMap<usize, wgpu::Buffer>,
 }
@@ -159,7 +158,6 @@ impl PhongPass {
             multiview: None,
         });
 
-        let depth_texture = Texture::create_depth_texture(&device, &config, "Phong Depth Texture");
         let instance_buffers = HashMap::new();
 
         Self {
@@ -170,7 +168,6 @@ impl PhongPass {
             global_bind_group_layout,
             global_bind_group,
             texture_bind_group_layout,
-            depth_texture,
             render_pipeline,
             instance_buffers,
         }
@@ -190,7 +187,7 @@ impl RenderPass for PhongPass {
         let clear_color = wgpu::Color {
             r: 0.1,
             g: 0.2,
-            b: 0.3,
+            b: 0.5,
             a: 1.0,
         };
 
@@ -211,7 +208,7 @@ impl RenderPass for PhongPass {
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &self.depth_texture.view,
+                view: &depth_texture.unwrap().view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
                     store: wgpu::StoreOp::Store,
@@ -248,12 +245,6 @@ impl RenderPass for PhongPass {
         }
         
         drop(render_pass); // Need to drop `render_pass` to release the mutable borrow of `encoder` so we can call `encoder.finish()`
-        
-        // let screen_descriptor = ScreenDescriptor {
-        //     size_in_pixels: [app_data.config.width, app_data.config.height],
-        //     pixels_per_point: self.window.scale_factor() as f32, // FIXME
-        // };
-
         Ok(encoder)
     }
 }
