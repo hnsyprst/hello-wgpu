@@ -85,9 +85,16 @@ impl Texture {
     }
 
     pub fn create_depth_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, label: &str) -> Self {
+        let mut width = 100;
+        let mut height = 100;
+        if config.width > 0 && config.height > 0 { // height or width being 0 may cause crashes
+            width = config.width;
+            height = config.height;
+        }
+        
         let size = wgpu::Extent3d {
-            width: config.width,
-            height: config.height,
+            width: width,
+            height: height,
             depth_or_array_layers: 1,
         };
         let description = wgpu::TextureDescriptor {

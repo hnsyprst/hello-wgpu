@@ -1,5 +1,8 @@
-use egui_wgpu::renderer::ScreenDescriptor;
+use std::sync::Arc;
+use log::{debug, error, log_enabled, info, Level};
+
 use wgpu::RenderPipeline;
+use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::{
     event::{self, *},
@@ -19,21 +22,21 @@ pub struct AppData {
     
     pub size: winit::dpi::PhysicalSize<u32>,
 
-    pub surface: wgpu::Surface,
+    pub surface: wgpu::Surface<'static>,
 }
 
 impl AppData {
     pub async fn new(
-        window: &winit::window::Window
+        window: Arc<winit::window::Window>,
     ) -> Self {
         // The `instance` is a handle to our GPU. Its main purpose is to create `Adapter`s and `Surface`s.
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(), // Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
             ..Default::default()
         });
-        
+
         // The `surface` is the part of the window that we are drawing to.
-        let surface = unsafe { instance.create_surface(&window) }.unwrap(); // The surface needs to live as long as the window that created it!
+        let surface = instance.create_surface(Arc::clone(&window)).unwrap(); // The surface needs to live as long as the window that created it!
 
         // The `adapter` is a handle for our actual graphics card. We need it to create the `Device` and `Queue`.
         // `Adapter`s are locked to a specific backend (i.e., if you have two GPUs on windows you'll have 4 `Adapters` to chose from: 2 Vulkan and 2 DirectX).
@@ -50,8 +53,8 @@ impl AppData {
         // The `device` is responsible for the creation of most rendering and compute resources. These are used in commands passed to the `queue`.
         let (device, queue) = adapter.request_device(
             &wgpu::DeviceDescriptor {
-                features: wgpu::Features::empty(), // Enable features not guaranteed to be supported. See docs for full list
-                limits: if cfg!(target_arch = "wasm32") { // Describes the limits an adapter/device supports. Recommended to start with the most resticted limits and and manually increase to stay running on all hardware that supports the limits needed
+                required_features: wgpu::Features::empty(), // Enable features not guaranteed to be supported. See docs for full list
+                required_limits: if cfg!(target_arch = "wasm32") { // Describes the limits an adapter/device supports. Recommended to start with the most resticted limits and and manually increase to stay running on all hardware that supports the limits needed
                     wgpu::Limits::downlevel_webgl2_defaults() // Worth playing with this now that WebGPU is supported in Chrome---Limits::default() is guaranteed to support WebGPU
                 } else {
                     wgpu::Limits::default()
@@ -61,8 +64,12 @@ impl AppData {
             None,
         ).await.unwrap();
 
+        // FIXME: In wasm we seem to rely totally on the canvas being scaled correctly before this is run?
+        // If the canvas isn't scaled in time, the app will crash. Find a fix!
+        let size: PhysicalSize<u32> = window.inner_size();
+        error!("size {}, {}", size.width, size.height);
+
         // Setting up `config`` defining how the surface creates `SurfaceTexture`s
-        let size = window.inner_size();
         let surface_capabilities = surface.get_capabilities(&adapter);
         let surface_format = surface_capabilities.formats.iter()
             .copied()
@@ -78,6 +85,7 @@ impl AppData {
                                                                  // For runtime selection, `let modes = &surface_caps.present_modes;` will get a list of all `PresentMode`s supported by the surface
             alpha_mode: surface_capabilities.alpha_modes[0],
             view_formats: vec![],
+            desired_maximum_frame_latency: 2, // TODO: Look into this
         };
         surface.configure(&device, &config);
 
@@ -125,7 +133,7 @@ impl<T: 'static> App<T> {
         new_size: winit::dpi::PhysicalSize<u32>
     ) {
         // Configures `self.surface` to match `new_size`.
-        if new_size.width > 0 && new_size.height > 0 { // height or width being 0 may cause crashes
+        if new_size.width <= 0 && new_size.height <= 0 { // height or width being 0 may cause crashes
             return;
         }
 
@@ -134,8 +142,7 @@ impl<T: 'static> App<T> {
         self.app_data.config.width = new_size.width;
         self.app_data.config.height = new_size.height;
         self.app_data.surface.configure(&self.app_data.device, &self.app_data.config);
-        // TODO: Move this to the actual app's resize_fn
-        // self.depth_texture = texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
+        (self.resize_fn)(&self.app_data, &mut self.state, new_size.into());
     }
 
     fn render(
@@ -143,7 +150,7 @@ impl<T: 'static> App<T> {
     ) -> Result<(), wgpu::SurfaceError> {
         // Get a frame to render to
         let output = self.app_data.surface.get_current_texture()?;
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view: wgpu::TextureView = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
         // Create a `CommandEncoder` to create the store commands in a command buffer that will be sent to the GPU
         let mut encoder = self.app_data.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
@@ -158,12 +165,12 @@ impl<T: 'static> App<T> {
 
     pub fn run(
         mut self,
-        window: winit::window::Window,
+        window: Arc<winit::window::Window>,
         event_loop: EventLoop<()>,
     ) {
         window.set_visible(true);
 
-        event_loop.run(move |event, _, control_flow| match event {
+        let _ = event_loop.run(move |event, elwt| match event {
             Event::WindowEvent {
                 ref event,
                 window_id,
@@ -173,40 +180,29 @@ impl<T: 'static> App<T> {
                 }
                 match event {
                     WindowEvent::CloseRequested => {
-                        *control_flow = ControlFlow::Exit;
+                        elwt.exit();
                     }
                     WindowEvent::Resized(physical_size) => {
                         log::info!("Resized to {:?}", physical_size);
                         self.resize(*physical_size);
                     }
-                    WindowEvent::ScaleFactorChanged{ new_inner_size, .. } => {
-                        self.resize(**new_inner_size);
+                    // TODO: Handle ScaleFactorChanged
+                    WindowEvent::RedrawRequested => {
+                        (self.update_fn)(&self.app_data, &mut self.state);
+                        match self.render() {
+                            Ok(_) => {}
+                            // The surface is lost, so we need to reconfigure the surface
+                            Err(wgpu::SurfaceError::Lost) => self.resize(self.app_data.size),
+                            // The system is OOM, so let's just quit
+                            Err(wgpu::SurfaceError::OutOfMemory) => elwt.exit(),
+                            // Anything else should be resolved by the next frame, so print an error and move on
+                            Err(e) => eprintln!("{:?}", e),
+                        }
+                        // TODO: Does this belong here?
+                        window.request_redraw();
                     }
-                    _ => {
-                        (self.window_event_fn)(&self.app_data, &mut self.state, event);
-                    }
+                    _ => (self.window_event_fn)(&self.app_data, &mut self.state, event),
                 };
-            }
-            Event::RedrawRequested(
-                window_id,
-            ) => {
-                if window_id != window.id() {
-                    return;
-                }
-                (self.update_fn)(&self.app_data, &mut self.state);
-                match self.render() {
-                    Ok(_) => {}
-                    // The surface is lost, so we need to reconfigure the surface
-                    Err(wgpu::SurfaceError::Lost) => self.resize(self.app_data.size),
-                    // The system is OOM, so let's just quit
-                    Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                    // Anything else should be resolved by the next frame, so print an error and move on
-                    Err(e) => eprintln!("{:?}", e),
-                }
-            }
-            Event::MainEventsCleared => {
-                // RedrawRequested will only trigger once unless we manually request it.
-                window.request_redraw();
             }
             _ => {}
         });
@@ -247,10 +243,10 @@ pub async fn run_app<T: 'static>(
     update_fn: UpdateFn<T>,
     render_fn: RenderFn<T>,
 ){
-    let event_loop = EventLoop::new();
-    let window = create_window(title, &event_loop);
+    let event_loop = EventLoop::new().unwrap();
+    let window = Arc::new(create_window(title, &event_loop));
 
-    let app_data = AppData::new(&window).await;
+    let app_data = AppData::new(Arc::clone(&window)).await;
 
     let mut app = App::new(
         state,

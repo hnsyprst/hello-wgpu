@@ -1,4 +1,5 @@
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::keyboard::{self, PhysicalKey, KeyCode};
 use wgpu::util::DeviceExt;
 use cgmath;
 
@@ -91,38 +92,37 @@ impl CameraController {
         }
     }
 
-    pub fn process_events(&mut self, event: &WindowEvent) -> bool {
+    pub fn process_events(
+        &mut self,
+        event: &WindowEvent
+    ) {
         match event {
             WindowEvent::KeyboardInput {
-                input: KeyboardInput {
+                event: KeyEvent {
+                    physical_key: PhysicalKey::Code(key),
                     state,
-                    virtual_keycode: Some(keycode),
                     ..
                 },
                 ..
             } => {
                 let is_pressed = *state == ElementState::Pressed;
-                match keycode {
-                    VirtualKeyCode::W | VirtualKeyCode::Up => {
+                match key {
+                    KeyCode::KeyW | KeyCode::ArrowUp => {
                         self.is_forward_pressed = is_pressed;
-                        true
                     }
-                    VirtualKeyCode::A | VirtualKeyCode::Left => {
+                    KeyCode::KeyA | KeyCode::ArrowLeft => {
                         self.is_left_pressed = is_pressed;
-                        true
                     }
-                    VirtualKeyCode::S | VirtualKeyCode::Down => {
+                    KeyCode::KeyS | KeyCode::ArrowDown => {
                         self.is_backward_pressed = is_pressed;
-                        true
                     }
-                    VirtualKeyCode::D | VirtualKeyCode::Right => {
+                    KeyCode::KeyD | KeyCode::ArrowRight => {
                         self.is_right_pressed = is_pressed;
-                        true
                     }
-                    _ => false,
+                    _ => {},
                 }
             }
-            _ => false,
+            _ => {},
         }
     }
 

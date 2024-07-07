@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use cgmath::Rotation3;
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
@@ -20,7 +21,6 @@ use instance::Instance;
 use model::{Model, Vertex};
 use render_pass::{phong::PhongPass, RenderPass};
 use cgmath::prelude::*;
-use egui::{Align2, Context};
 use wgpu::{util::DeviceExt, Color, CommandEncoder, RenderPipeline, SurfaceError};
 use winit::{
     event::{self, *},
@@ -43,6 +43,7 @@ struct State {
     basic_objects: Vec<object::Object>,
     phong_pass: render_pass::phong::PhongPass,
     phong_objects: Vec<object::Object>,
+    depth_texture: texture::Texture,
     // clear_color: wgpu::Color,
     camera: camera::Camera,
     camera_controller: camera::CameraController,
@@ -52,15 +53,6 @@ impl State {
     async fn new(
         app_data: &app::AppData,
     ) -> Self {
-        // // Set up the GUI
-        // let mut egui_renderer = gui::EguiRenderer::new(
-        //     &app_data.device,
-        //     app_data.config.format,
-        //     None,
-        //     1,
-        //     &window,
-        // );
-        
         // Set up a default screen clear colour
         // let clear_color = wgpu::Color {
         //     r: 0.1,
@@ -124,7 +116,7 @@ impl State {
             Instance { position, rotation, rotation_speed }
         }).collect::<Vec<_>>();
         let ferris_instance = vec![{
-            let position = cgmath::Vector3 { x: 0.0, y: 0.0, z: 0.0 };
+            let position = cgmath::Vector3 { x: 1.0, y: 1.0, z: 1.0 };
             let rotation = if position.is_zero() {
                 cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
             } else {
@@ -137,12 +129,14 @@ impl State {
             object::Object{ model: cube_model, instances: cube_instances },
             object::Object{ model: ferris_model, instances: ferris_instance },
         ];
+        let depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "Depth Texture");
 
         Self {
             basic_pass,
             basic_objects,
             phong_pass,
             phong_objects,
+            depth_texture,
             // clear_color,
             camera,
             camera_controller,
@@ -186,6 +180,8 @@ fn resize(
     size: (u32, u32),
 ) {
     // state.depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "depth_texture");
+    // TODO: Move this to the actual app's resize_fn
+    state.depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "depth_texture");
 }
 
 fn update(
@@ -230,14 +226,14 @@ fn render(
         &view,
         encoder,
         &state.phong_objects,
-        None,
+        Some(&state.depth_texture),
     ).unwrap();
     encoder = state.basic_pass.draw(
         app_data,
         &view,
         encoder,
         &state.basic_objects,
-        Some(&state.phong_pass.depth_texture),
+        Some(&state.depth_texture),
     ).unwrap();
 
     // `Queue.submit()` will accept anything that implements `IntoIter`, so we wrap `encoder.finish()` up in `std::iter::once`
@@ -256,9 +252,9 @@ pub async fn run() {
         }
     }
     
-    let event_loop = EventLoop::new();
-    let window = app::create_window("cubes-app", &event_loop);
-    let app_data = app::AppData::new(&window).await;
+    let event_loop = EventLoop::new().unwrap();
+    let window = Arc::new(app::create_window("cubes-app", &event_loop));
+    let app_data = app::AppData::new(Arc::clone(&window)).await;
     let mut state = State::new(&app_data).await;
     let mut app = app::App::new(
         state,
