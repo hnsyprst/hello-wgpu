@@ -1,23 +1,29 @@
-use std::{
-    collections::HashMap,
-    iter,
-};
+use std::collections::HashMap;
 use crate::{
-    app::{self, AppData}, camera::{
+    app::AppData,
+    camera::{
         self,
         Camera,
         CameraUniform,
-    }, instance, light::LightUniform, model::{
-        self, DrawModel, Material, Vertex
-    }, object::{self, Object}, texture::Texture, State
+    },
+    instance,
+    light,
+    model::{
+        self,
+        DrawModel,
+        Material,
+        Vertex,
+    },
+    object:: Object,
+    texture::Texture,
 };
-use super::{RenderPass};
-use wgpu::{util::DeviceExt, BindGroupLayout, Device, Queue, Surface};
+use super::RenderPass;
+use wgpu::util::DeviceExt;
 
 pub struct PhongPass {
     pub camera_uniform: CameraUniform,
     camera_uniform_buffer: wgpu::Buffer,
-    pub light_uniform: LightUniform,
+    pub light_uniform: light::LightUniform,
     light_uniform_buffer: wgpu::Buffer,
     pub global_bind_group_layout: wgpu::BindGroupLayout,
     pub global_bind_group: wgpu::BindGroup,
@@ -78,7 +84,7 @@ impl PhongPass {
         );
         // Set up lighting and create buffer
         // TODO: Lights could be passed in instead like the camera
-        let light_uniform = LightUniform {
+        let light_uniform = light::LightUniform {
             position: [10.0, 10.0, 10.0],
             _padding: 0,
             color: [1.0, 1.0, 1.0],

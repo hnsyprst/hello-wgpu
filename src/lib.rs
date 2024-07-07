@@ -16,17 +16,10 @@ mod texture;
 mod render_pass;
 mod object;
 
-use light::LightUniform;
 use instance::Instance;
-use model::{Model, Vertex};
-use render_pass::{phong::PhongPass, RenderPass};
+use render_pass::RenderPass;
 use cgmath::prelude::*;
-use wgpu::{util::DeviceExt, Color, CommandEncoder, RenderPipeline, SurfaceError};
-use winit::{
-    event::{self, *},
-    event_loop::{self, ControlFlow, EventLoop},
-    window::{self, Window, WindowBuilder},
-};
+use winit::{event::WindowEvent, event_loop::EventLoop};
 use rand::Rng;
 
 #[derive(serde::Deserialize, Debug)]
