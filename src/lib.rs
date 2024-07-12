@@ -44,7 +44,7 @@ struct State {
 
 impl State {
     async fn new(
-        app_data: &app::AppData,
+        app_data: &mut app::AppData,
     ) -> Self {
         // Set up a default screen clear colour
         // let clear_color = wgpu::Color {
@@ -138,7 +138,7 @@ impl State {
 }
 
 fn window_event(
-    app_data: &app::AppData,
+    app_data: &mut app::AppData,
     state: &mut State,
     window_event: &WindowEvent,
 ) {
@@ -168,7 +168,7 @@ fn window_event(
 }
 
 fn resize(
-    app_data: &app::AppData,
+    app_data: &mut app::AppData,
     state: &mut State,
     size: (u32, u32),
 ) {
@@ -178,7 +178,7 @@ fn resize(
 }
 
 fn update(
-    app_data: &app::AppData,
+    app_data: &mut app::AppData,
     state: &mut State,
 ) {
     // Move instances
@@ -209,7 +209,7 @@ fn update(
 }
 
 fn render(
-    app_data: &app::AppData,
+    app_data: &mut app::AppData,
     state: &mut State,
     view: wgpu::TextureView,
     mut encoder: wgpu::CommandEncoder,
@@ -229,6 +229,38 @@ fn render(
         Some(&state.depth_texture),
     ).unwrap();
 
+    app_data.egui_renderer.draw(
+        &app_data.device,
+        &app_data.queue,
+        &mut encoder,
+        &view,
+        |ctx| {
+            egui::Window::new("🖥 Info")
+                .resizable(true)
+                .vscroll(true)
+                .default_open(true)
+                .show(&ctx, |mut ui| {
+                    egui::Grid::new("my_grid")
+                        .num_columns(2)
+                        .spacing([40.0, 4.0])
+                        .striped(true)
+                        .show(ui, |ui| {
+                            ui.label("FPS");
+                            ui.label(format!("{:.4}", app_data.fps));
+                            ui.end_row();
+                            
+                            ui.label("Render time");
+                            ui.label(format!("{:.4}ms", app_data.render_time * 1000.0));
+                            ui.end_row();
+                            
+                            ui.label("Update time");
+                            ui.label(format!("{:.4}ms", app_data.update_time * 1000.0));
+                            ui.end_row();
+                        });
+                });
+        },
+    );
+
     // `Queue.submit()` will accept anything that implements `IntoIter`, so we wrap `encoder.finish()` up in `std::iter::once`
     app_data.queue.submit(std::iter::once(encoder.finish()));
 }
@@ -247,8 +279,8 @@ pub async fn run() {
     
     let event_loop = EventLoop::new().unwrap();
     let window = Arc::new(app::create_window("cubes-app", &event_loop));
-    let app_data = app::AppData::new(Arc::clone(&window)).await;
-    let mut state = State::new(&app_data).await;
+    let mut app_data = app::AppData::new(Arc::clone(&window)).await;
+    let mut state = State::new(&mut app_data).await;
     let mut app = app::App::new(
         state,
         app_data,

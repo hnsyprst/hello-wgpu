@@ -1,5 +1,13 @@
 use std::sync::Arc;
+#[cfg(not(target_arch="wasm32"))]
+use std::time::Instant;
+#[cfg(target_arch="wasm32")]
+use web_time::Instant;
 use log::{debug, error, log_enabled, info, Level};
+
+use crate::gui;
+
+use egui_wgpu::ScreenDescriptor;
 
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -9,12 +17,22 @@ use winit::{
     window::WindowBuilder,
 };
 
-pub type WindowEventFn<T> = fn(app_data: &AppData, state: &mut T, window_event: &WindowEvent);
-pub type ResizeFn<T> = fn(app_data: &AppData, state: &mut T, size: (u32, u32));
-pub type UpdateFn<T> = fn(app_data: &AppData, state: &mut T);
-pub type RenderFn<T> = fn(app_data: &AppData, state: &mut T, view: wgpu::TextureView, encoder: wgpu::CommandEncoder);
+
+pub type WindowEventFn<T> = fn(app_data: &mut AppData, state: &mut T, window_event: &WindowEvent);
+pub type ResizeFn<T> = fn(app_data: &mut AppData, state: &mut T, size: (u32, u32));
+pub type UpdateFn<T> = fn(app_data: &mut AppData, state: &mut T);
+pub type RenderFn<T> = fn(app_data: &mut AppData, state: &mut T, view: wgpu::TextureView, encoder: wgpu::CommandEncoder);
 
 pub struct AppData {
+    last_frame_time_instant: Instant,
+    render_time_instant: Instant,
+    update_time_instant: Instant,
+
+    pub fps: f64,
+    pub delta_time: f64,
+    pub render_time: f64,
+    pub update_time: f64,
+
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
@@ -22,6 +40,8 @@ pub struct AppData {
     pub size: winit::dpi::PhysicalSize<u32>,
 
     pub surface: wgpu::Surface<'static>,
+
+    pub egui_renderer: gui::EguiRenderer,
 }
 
 impl AppData {
@@ -88,12 +108,38 @@ impl AppData {
         };
         surface.configure(&device, &config);
 
+        let screen_descriptor = ScreenDescriptor {
+            size_in_pixels: [config.width, config.height],
+            pixels_per_point: window.scale_factor() as f32,
+        };
+        
+        let mut egui_renderer = gui::EguiRenderer::new(
+            &device,
+            config.format,
+            None,
+            1,
+            Arc::clone(&window),
+            screen_descriptor,
+        );
+
+        let last_frame_time_instant = Instant::now();
+        let render_time_instant = Instant::now();
+        let update_time_instant = Instant::now();
+
         AppData {
+            last_frame_time_instant,
+            render_time_instant,
+            update_time_instant,
+            fps: 1.0,
+            delta_time: 1.0,
+            render_time: 1.0,
+            update_time: 1.0,
             device,
             queue,
             config,
             size,
             surface,
+            egui_renderer,
         }
     }
 }
@@ -141,7 +187,7 @@ impl<T: 'static> App<T> {
         self.app_data.config.width = new_size.width;
         self.app_data.config.height = new_size.height;
         self.app_data.surface.configure(&self.app_data.device, &self.app_data.config);
-        (self.resize_fn)(&self.app_data, &mut self.state, new_size.into());
+        (self.resize_fn)(&mut self.app_data, &mut self.state, new_size.into());
     }
 
     fn render(
@@ -155,7 +201,7 @@ impl<T: 'static> App<T> {
             label: Some("Render Encoder"),
         });
 
-        (self.render_fn)(&self.app_data, &mut self.state, view, encoder);
+        (self.render_fn)(&mut self.app_data, &mut self.state, view, encoder);
 
         output.present();
 
@@ -184,10 +230,22 @@ impl<T: 'static> App<T> {
                     WindowEvent::Resized(physical_size) => {
                         log::info!("Resized to {:?}", physical_size);
                         self.resize(*physical_size);
+                        self.app_data.egui_renderer.screen_descriptor = ScreenDescriptor {
+                            size_in_pixels: [self.app_data.config.width, self.app_data.config.height],
+                            pixels_per_point: window.scale_factor() as f32,
+                        };
                     }
                     // TODO: Handle ScaleFactorChanged
                     WindowEvent::RedrawRequested => {
-                        (self.update_fn)(&self.app_data, &mut self.state);
+                        self.app_data.delta_time = self.app_data.last_frame_time_instant.elapsed().as_secs_f64();
+                        self.app_data.fps = 1.0 / self.app_data.delta_time;
+                        self.app_data.last_frame_time_instant = Instant::now();
+                        
+                        self.app_data.update_time_instant = Instant::now();
+                        (self.update_fn)(&mut self.app_data, &mut self.state);
+                        self.app_data.update_time = self.app_data.update_time_instant.elapsed().as_secs_f64();
+                        
+                        self.app_data.render_time_instant = Instant::now();
                         match self.render() {
                             Ok(_) => {}
                             // The surface is lost, so we need to reconfigure the surface
@@ -197,10 +255,14 @@ impl<T: 'static> App<T> {
                             // Anything else should be resolved by the next frame, so print an error and move on
                             Err(e) => eprintln!("{:?}", e),
                         }
+                        self.app_data.render_time = self.app_data.render_time_instant.elapsed().as_secs_f64();
                         // TODO: Does this belong here?
                         window.request_redraw();
                     }
-                    _ => (self.window_event_fn)(&self.app_data, &mut self.state, event),
+                    _ => {
+                        self.app_data.egui_renderer.handle_input(event);
+                        (self.window_event_fn)(&mut self.app_data, &mut self.state, event)
+                    } ,
                 };
             }
             _ => {}
