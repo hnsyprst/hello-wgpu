@@ -39,7 +39,6 @@ struct State {
     phong_pass: render_pass::phong::PhongPass,
     phong_objects: Vec<object::Object>,
     depth_texture: texture::Texture,
-    // clear_color: wgpu::Color,
     camera: camera::Camera,
     camera_controller: camera::CameraController,
 }
@@ -48,14 +47,6 @@ impl State {
     async fn new(
         app_data: &mut app::AppData,
     ) -> Self {
-        // Set up a default screen clear colour
-        // let clear_color = wgpu::Color {
-        //     r: 0.1,
-        //     g: 0.2,
-        //     b: 0.3,
-        //     a: 1.0,
-        // };
-
         // Set up camera
         let camera = camera::Camera::new(
             cgmath::Point3::new(0.0, 1.0, 2.0),
@@ -98,9 +89,6 @@ impl State {
         const SPACE_BETWEEN: f32 = 5.0;
         let mut rng = rand::thread_rng();
         let cube_instances = songs.iter().map(|song| {
-            // let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
-            // let z = SPACE_BETWEEN * (z as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
-
             let position = cgmath::Vector3 { x: song.x * SPACE_BETWEEN, y: song.y * SPACE_BETWEEN, z: song.z * SPACE_BETWEEN };
             let rotation = if position.is_zero() {
                 cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
@@ -135,7 +123,6 @@ impl State {
             phong_pass,
             phong_objects,
             depth_texture,
-            // clear_color,
             camera,
             camera_controller,
         }
@@ -148,24 +135,6 @@ fn window_event(
     window_event: &WindowEvent,
 ) {
     match window_event {
-        // WindowEvent::CursorMoved { position, .. } => {
-        //     state.clear_color = wgpu::Color {
-        //         r: position.x / app_data.size.width as f64,
-        //         g: position.y / app_data.size.height as f64,
-        //         b: 1.0,
-        //         a: 1.0,
-        //     };
-        // },
-        // WindowEvent::KeyboardInput {
-        //     input: KeyboardInput {
-        //         state: ElementState::Pressed,
-        //         virtual_keycode: Some(VirtualKeyCode::Space),
-        //         ..
-        //     },
-        //     ..
-        // } => {
-        //     state.render_pipeline_index = (state.render_pipeline_index + 1) % app_data.render_pipelines.len();
-        // }
         _ => {
             state.camera_controller.process_events(window_event);
         }
@@ -223,8 +192,6 @@ fn update(
             num_instances: state.phong_objects.iter().map(|object| object.instances.len() as u32).sum()
         }
     );
-    // // Despite not explicitly using a staging buffer, this is still pretty performant (apparently) https://github.com/gfx-rs/wgpu/discussions/1438#discussioncomment-345473
-    // app_data.queue.write_buffer(&state.camera.uniform_buffer(), 0, bytemuck::cast_slice(&[*state.camera.uniform()]));
 }
 
 fn render(
