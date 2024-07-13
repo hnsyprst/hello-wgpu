@@ -45,8 +45,8 @@ impl GuiWindow for StatsWindow {
         &mut self,
         event: &SendAny,
     ) {
-        if let Some(ev) = event.downcast_ref::<StatsEvent>() {
-            self.num_instances = ev.num_instances;
+        if let Some(stats_event) = event.downcast_ref::<StatsEvent>() {
+            self.num_instances = stats_event.num_instances;
         }
     }
 }

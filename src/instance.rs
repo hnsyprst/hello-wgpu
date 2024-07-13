@@ -64,7 +64,9 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn to_raw(&self) -> RawInstance {
+    pub fn to_raw(
+        &self,
+    ) -> RawInstance {
         RawInstance {
             model: (cgmath:: Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into(),
             normal: cgmath::Matrix3::from(self.rotation).into(),

@@ -50,19 +50,19 @@ impl AppData {
     ) -> Self {
         // The `instance` is a handle to our GPU. Its main purpose is to create `Adapter`s and `Surface`s.
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(), // Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
+            backends: wgpu::Backends::all(), // Backends::all = Vulkan + Metal + DX12 + Browser WebGPU
             ..Default::default()
         });
 
         // The `surface` is the part of the window that we are drawing to.
-        let surface = instance.create_surface(Arc::clone(&window)).unwrap(); // The surface needs to live as long as the window that created it!
+        let surface = instance.create_surface(Arc::clone(&window)).unwrap();
 
         // The `adapter` is a handle for our actual graphics card. We need it to create the `Device` and `Queue`.
         // `Adapter`s are locked to a specific backend (i.e., if you have two GPUs on windows you'll have 4 `Adapters` to chose from: 2 Vulkan and 2 DirectX).
         let adapter = instance.request_adapter(
             &wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(), // `LowPower` will pick an adapter that favors battery life, such as an integrated GPU. 
-                                                                    // `HighPerformance` will pick an adapter for more power-hungry yet more performant GPU's, such as a dedicated graphics card.
+                                                                    // `HighPerformance` will pick an adapter for more power-hungry yet more performant GPUs, such as a dedicated graphics card.
                                                                     // `default` will pick the first available adapter.
                 compatible_surface: Some(&surface), // Find an adapter compatible with the supplied surface.
                 force_fallback_adapter: false, // Forces the instance to pick an adapter compatible with all hardware (typically forces a "software" rendering backend for instead of using GPU hardware)
@@ -73,11 +73,7 @@ impl AppData {
         let (device, queue) = adapter.request_device(
             &wgpu::DeviceDescriptor {
                 required_features: wgpu::Features::empty(), // Enable features not guaranteed to be supported. See docs for full list
-                required_limits: if cfg!(target_arch = "wasm32") { // Describes the limits an adapter/device supports. Recommended to start with the most resticted limits and and manually increase to stay running on all hardware that supports the limits needed
-                    wgpu::Limits::downlevel_webgl2_defaults() // Worth playing with this now that WebGPU is supported in Chrome---Limits::default() is guaranteed to support WebGPU
-                } else {
-                    wgpu::Limits::default()
-                },
+                required_limits: wgpu::Limits::default(), // Describes the limits an adapter/device supports. Recommended to start with the most resticted limits and and manually increase to stay running on all hardware that supports the limits needed
                 label: None,
             },
             None,
@@ -87,11 +83,11 @@ impl AppData {
         let mut size: PhysicalSize<u32> = window.inner_size();
         size.width = size.width.max(1);
         size.height = size.height.max(1);
-        error!("size {}, {}", size.width, size.height);
+        info!("size {}, {}", size.width, size.height);
 
         // Setting up `config`` defining how the surface creates `SurfaceTexture`s
         let surface_capabilities = surface.get_capabilities(&adapter);
-        error!("surface_capabilities {:?}", surface_capabilities.formats.iter());
+        info!("surface_capabilities {:?}", surface_capabilities.formats.iter());
         let surface_format = surface_capabilities.formats.iter()
             .find(|f| **f == TextureFormat::Bgra8UnormSrgb)
             .unwrap_or(&surface_capabilities.formats[0]);
@@ -124,14 +120,10 @@ impl AppData {
             screen_descriptor,
         );
 
-        let last_frame_time_instant = Instant::now();
-        let render_time_instant = Instant::now();
-        let update_time_instant = Instant::now();
-
         AppData {
-            last_frame_time_instant,
-            render_time_instant,
-            update_time_instant,
+            last_frame_time_instant: Instant::now(),
+            render_time_instant: Instant::now(),
+            update_time_instant: Instant::now(),
             fps: 1.0,
             delta_time: 1.0,
             render_time: 1.0,
