@@ -181,7 +181,6 @@ impl<T: 'static> App<T> {
             return;
         }
 
-        // self.window.set_inner_size(new_size);
         self.app_data.size = new_size;
         self.app_data.config.width = new_size.width;
         self.app_data.config.height = new_size.height;
@@ -255,7 +254,6 @@ impl<T: 'static> App<T> {
                             Err(e) => eprintln!("{:?}", e),
                         }
                         self.app_data.render_time = self.app_data.render_time_instant.elapsed().as_secs_f64();
-                        // TODO: Does this belong here?
                         window.request_redraw();
                     }
                     _ => {
