@@ -44,7 +44,6 @@ struct State {
     // clear_color: wgpu::Color,
     camera: camera::Camera,
     camera_controller: camera::CameraController,
-    gui_windows: HashMap<String, Box<dyn GuiWindow>>,
 }
 
 impl State {
@@ -129,10 +128,8 @@ impl State {
         ];
         let depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "Depth Texture");
 
-        let gui_windows = HashMap::from([
-            ("performance".to_string(), Box::new(gui::windows::performance::PerformanceWindow::new()) as Box<dyn GuiWindow>),
-            ("stats".to_string(), Box::new(gui::windows::stats::StatsWindow::new()) as Box<dyn GuiWindow>),
-        ]);
+        app_data.egui_renderer.add_gui_window("performance", Box::new(gui::windows::performance::PerformanceWindow::new()));
+        app_data.egui_renderer.add_gui_window("stats", Box::new(gui::windows::stats::StatsWindow::new()));
         
         Self {
             basic_pass,
@@ -143,7 +140,6 @@ impl State {
             // clear_color,
             camera,
             camera_controller,
-            gui_windows,
         }
     }
 }
@@ -217,24 +213,20 @@ fn update(
     state.basic_pass.camera_uniform.update_view_proj(&state.camera);
 
     // Update GUI
-    state.gui_windows
-        .get_mut("performance")
-        .unwrap()
-        .update(
-            &PerformanceEvent {
-                fps: app_data.fps,
-                render_time: app_data.render_time,
-                update_time: app_data.update_time,
-            }
-        );
-    state.gui_windows
-        .get_mut("stats")
-        .unwrap()
-        .update(
-            &StatsEvent {
-                num_instances: state.phong_objects.iter().map(|object| object.instances.len() as u32).sum()
-            }
-        );
+    app_data.egui_renderer.send_event(
+        "performance", 
+        &PerformanceEvent {
+            fps: app_data.fps,
+            render_time: app_data.render_time,
+            update_time: app_data.update_time,
+        }
+    );
+    app_data.egui_renderer.send_event(
+        "stats", 
+        &StatsEvent {
+            num_instances: state.phong_objects.iter().map(|object| object.instances.len() as u32).sum()
+        }
+    );
     // // Despite not explicitly using a staging buffer, this is still pretty performant (apparently) https://github.com/gfx-rs/wgpu/discussions/1438#discussioncomment-345473
     // app_data.queue.write_buffer(&state.camera.uniform_buffer(), 0, bytemuck::cast_slice(&[*state.camera.uniform()]));
 }
@@ -265,7 +257,6 @@ fn render(
         &app_data.queue,
         &mut encoder,
         &view,
-        &mut state.gui_windows,
     );
 
     // `Queue.submit()` will accept anything that implements `IntoIter`, so we wrap `encoder.finish()` up in `std::iter::once`
