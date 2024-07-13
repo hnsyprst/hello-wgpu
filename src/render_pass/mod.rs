@@ -1,6 +1,4 @@
-use wgpu::{Device, Queue, Surface};
-
-use crate::{model::Model, object::Object, app::AppData, State, texture::Texture};
+use crate::{object::Object, app::AppData, texture::Texture};
 
 pub mod phong;
 pub mod basic;

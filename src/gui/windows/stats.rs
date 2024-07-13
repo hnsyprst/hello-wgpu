@@ -28,7 +28,7 @@ impl GuiWindow for StatsWindow {
             .resizable(true)
             .vscroll(true)
             .default_open(true)
-            .show(&ctx, |mut ui| {
+            .show(&ctx, |ui| {
                 egui::Grid::new("stats_grid")
                     .num_columns(2)
                     .spacing([40.0, 4.0])

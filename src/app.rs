@@ -112,7 +112,7 @@ impl AppData {
             pixels_per_point: window.scale_factor() as f32,
         };
         
-        let mut egui_renderer = EguiRenderer::new(
+        let egui_renderer = EguiRenderer::new(
             &device,
             config.format,
             None,
@@ -196,7 +196,7 @@ impl<T: 'static> App<T> {
         let output = self.app_data.surface.get_current_texture()?;
         let view: wgpu::TextureView = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
         // Create a `CommandEncoder` to create the store commands in a command buffer that will be sent to the GPU
-        let mut encoder = self.app_data.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        let encoder = self.app_data.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
 
@@ -308,7 +308,7 @@ pub async fn run_app<T: 'static>(
 
     let app_data = AppData::new(Arc::clone(&window)).await;
 
-    let mut app = App::new(
+    let app = App::new(
         state,
         app_data,
         window_event_fn,

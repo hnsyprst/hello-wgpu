@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::collections::HashMap;
 use cgmath::Rotation3;
 use gui::windows::{performance::PerformanceEvent, stats::StatsEvent};
 #[cfg(target_arch="wasm32")]
@@ -20,7 +19,6 @@ mod object;
 
 use instance::Instance;
 use render_pass::RenderPass;
-use gui::windows::GuiWindow;
 
 use cgmath::prelude::*;
 use winit::{event::WindowEvent, event_loop::EventLoop};
@@ -179,8 +177,6 @@ fn resize(
     state: &mut State,
     size: (u32, u32),
 ) {
-    // state.depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "depth_texture");
-    // TODO: Move this to the actual app's resize_fn
     state.depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "depth_texture");
 }
 
@@ -278,8 +274,8 @@ pub async fn run() {
     let event_loop = EventLoop::new().unwrap();
     let window = Arc::new(app::create_window("cubes-app", &event_loop));
     let mut app_data = app::AppData::new(Arc::clone(&window)).await;
-    let mut state = State::new(&mut app_data).await;
-    let mut app = app::App::new(
+    let state = State::new(&mut app_data).await;
+    let app = app::App::new(
         state,
         app_data,
         window_event,
