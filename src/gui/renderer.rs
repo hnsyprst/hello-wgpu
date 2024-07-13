@@ -8,12 +8,14 @@ use winit::event::WindowEvent;
 use winit;
 
 use super::windows::GuiWindow;
+use super::SendAny;
 
 pub struct EguiRenderer {
     state: egui_winit::State,
     renderer: Renderer,
     window: Arc<winit::window::Window>,
     pub screen_descriptor: ScreenDescriptor,
+    gui_windows: HashMap<String, Box<dyn GuiWindow>>,
 }
 
 impl EguiRenderer {
@@ -41,11 +43,14 @@ impl EguiRenderer {
             msaa_samples,
         );
 
+        let gui_windows: HashMap<String, Box<dyn GuiWindow>> = HashMap::new();
+
         EguiRenderer {
             state: egui_state,
             renderer: egui_renderer,
             window: window,
             screen_descriptor: screen_descriptor,
+            gui_windows,
         }
     }
     
@@ -53,6 +58,25 @@ impl EguiRenderer {
         &self,
     ) -> &Context {
         self.state.egui_ctx()
+    }
+
+    pub fn add_gui_window(
+        &mut self,
+        gui_window_name: &str,
+        gui_window: Box<dyn GuiWindow>,
+    ) {
+        self.gui_windows.insert(gui_window_name.to_string(), gui_window);
+    }
+
+    pub fn send_event(
+        &mut self,
+        gui_window_name: &str,
+        event: &SendAny,
+    ) {
+        self.gui_windows
+            .get_mut(gui_window_name)
+            .unwrap()
+            .update(event);
     }
 
     pub fn handle_input(
@@ -68,7 +92,6 @@ impl EguiRenderer {
         queue: &Queue,
         encoder: &mut CommandEncoder,
         view: &TextureView,
-        gui_windows: &mut HashMap<String, Box<dyn GuiWindow>>,
     ) {
         self.state
             .egui_ctx()
@@ -76,7 +99,7 @@ impl EguiRenderer {
 
         let raw_input = self.state.take_egui_input(&self.window);
         let full_output = self.state.egui_ctx().run(raw_input, |ui| {
-            for (gui_window_name, mut gui_window) in gui_windows {
+            for (gui_window_name, mut gui_window) in &mut self.gui_windows {
                 gui_window.show(&self.state.egui_ctx());
             }
         });
