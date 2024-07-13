@@ -92,26 +92,26 @@ impl EguiRenderer {
             .set_pixels_per_point(self.screen_descriptor.pixels_per_point);
 
         let raw_input = self.state.take_egui_input(&self.window);
-        let full_output = self.state.egui_ctx().run(raw_input, |_ui| {
-            for (_, gui_window) in &mut self.gui_windows {
-                gui_window.show(&self.state.egui_ctx());
-            }
-        });
 
-        self.state
-            .handle_platform_output(&self.window, full_output.platform_output);
+        let full_output = self.state
+            .egui_ctx()
+            .run(raw_input, |_ui| {
+                for (_, gui_window) in &mut self.gui_windows {
+                    gui_window.show(&self.state.egui_ctx());
+                }
+            });
 
-        let tris = self
-            .state
+        self.state.handle_platform_output(&self.window, full_output.platform_output);
+
+        let tris = self.state
             .egui_ctx()
             .tessellate(full_output.shapes, self.state.egui_ctx().pixels_per_point());
         for (id, image_delta) in &full_output.textures_delta.set {
-            self.renderer
-                .update_texture(&device, &queue, *id, &image_delta);
+            self.renderer.update_texture(&device, &queue, *id, &image_delta);
         }
-        self.renderer
-            .update_buffers(&device, &queue, encoder, &tris, &self.screen_descriptor);
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        self.renderer.update_buffers(&device, &queue, encoder, &tris, &self.screen_descriptor);
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,
                 resolve_target: None,
@@ -122,11 +122,13 @@ impl EguiRenderer {
             })],
             depth_stencil_attachment: None,
             timestamp_writes: None,
-            label: Some("egui main render pass"),
+            label: Some("egui Render Pass"),
             occlusion_query_set: None,
         });
-        self.renderer.render(&mut rpass, &tris, &self.screen_descriptor);
-        drop(rpass);
+
+        self.renderer.render(&mut render_pass, &tris, &self.screen_descriptor);
+
+        drop(render_pass);
         for x in &full_output.textures_delta.free {
             self.renderer.free_texture(x)
         }

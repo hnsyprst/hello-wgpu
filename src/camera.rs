@@ -14,11 +14,14 @@ impl CameraUniform {
         use cgmath::SquareMatrix;
         Self {
             view_position: [0.0; 4],
-            view_proj: cgmath::Matrix4::identity().into()
+            view_proj: cgmath::Matrix4::identity().into(),
         }
     }
 
-    pub fn update_view_proj(&mut self, camera: &Camera) {
+    pub fn update_view_proj(
+        &mut self,
+        camera: &Camera,
+    ) {
         // We're using Vector4 because of the uniforms 16 byte spacing requirement
         self.view_position = camera.eye.to_homogeneous().into();
         self.view_proj = camera.build_view_projection_matrix().into();
@@ -52,7 +55,6 @@ impl Camera {
         fovy: f32,
         znear: f32,
         zfar: f32,
-        device: &wgpu::Device,
     ) -> Self {
         Self {
             eye,
@@ -65,7 +67,9 @@ impl Camera {
         }
     }
 
-    pub fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
+    pub fn build_view_projection_matrix(
+        &self,
+    ) -> cgmath::Matrix4<f32> {
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up); // move the world to be at the position and rotation of the camera
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         OPENGL_TO_WGPU_MATRIX * proj * view // cgmath is built for OpenGL, better (and might be fun) to implement this fn manually
@@ -81,7 +85,9 @@ pub struct CameraController {
 }
 
 impl CameraController {
-    pub fn new(speed: f32) -> Self {
+    pub fn new(
+        speed: f32,
+    ) -> Self {
         Self {
             speed,
             is_forward_pressed: false,
@@ -93,7 +99,7 @@ impl CameraController {
 
     pub fn process_events(
         &mut self,
-        event: &WindowEvent
+        event: &WindowEvent,
     ) {
         match event {
             WindowEvent::KeyboardInput {
@@ -125,7 +131,10 @@ impl CameraController {
         }
     }
 
-    pub fn update_camera(&self, camera: &mut Camera) {
+    pub fn update_camera(
+        &self,
+        camera: &mut Camera,
+    ) {
         use cgmath::InnerSpace;
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();

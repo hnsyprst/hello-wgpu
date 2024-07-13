@@ -59,10 +59,10 @@ impl GuiWindow for PerformanceWindow {
         &mut self,
         event: &SendAny,
     ) {
-        if let Some(ev) = event.downcast_ref::<PerformanceEvent>() {
-            self.fps = ev.fps;
-            self.render_time = ev.render_time;
-            self.update_time = ev.update_time;
+        if let Some(performance_event) = event.downcast_ref::<PerformanceEvent>() {
+            self.fps = performance_event.fps;
+            self.render_time = performance_event.render_time;
+            self.update_time = performance_event.update_time;
         }
     }
 }

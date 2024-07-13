@@ -84,7 +84,11 @@ impl Texture {
         Ok(Self { texture, view, sampler })
     }
 
-    pub fn create_depth_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, label: &str) -> Self {
+    pub fn create_depth_texture(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+        label: &str,
+    ) -> Self {
         let mut width = 100;
         let mut height = 100;
         if config.width > 0 && config.height > 0 { // height or width being 0 may cause crashes

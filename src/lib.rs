@@ -56,7 +56,6 @@ impl State {
             45.0,
             0.1,
             100.0,
-            &app_data.device,
         );
         
         let camera_controller = camera::CameraController::new(0.2);
