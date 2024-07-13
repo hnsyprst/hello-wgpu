@@ -83,9 +83,10 @@ impl AppData {
             None,
         ).await.unwrap();
 
-        // FIXME: In wasm we seem to rely totally on the canvas being scaled correctly before this is run?
-        // If the canvas isn't scaled in time, the app will crash. Find a fix!
-        let size: PhysicalSize<u32> = window.inner_size();
+        // Size is only valid once we enter the render loop
+        let mut size: PhysicalSize<u32> = window.inner_size();
+        size.width = size.width.max(1);
+        size.height = size.height.max(1);
         error!("size {}, {}", size.width, size.height);
 
         // Setting up `config`` defining how the surface creates `SurfaceTexture`s
