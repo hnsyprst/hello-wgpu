@@ -29,7 +29,7 @@ impl EguiRenderer {
     ) -> EguiRenderer {
         let egui_context = Context::default();
 
-        let mut egui_state = egui_winit::State::new(
+        let egui_state = egui_winit::State::new(
             egui_context,
             egui::viewport::ViewportId::ROOT,
             &window,
@@ -52,12 +52,6 @@ impl EguiRenderer {
             screen_descriptor: screen_descriptor,
             gui_windows,
         }
-    }
-    
-    pub fn context(
-        &self,
-    ) -> &Context {
-        self.state.egui_ctx()
     }
 
     pub fn add_gui_window(
@@ -98,8 +92,8 @@ impl EguiRenderer {
             .set_pixels_per_point(self.screen_descriptor.pixels_per_point);
 
         let raw_input = self.state.take_egui_input(&self.window);
-        let full_output = self.state.egui_ctx().run(raw_input, |ui| {
-            for (gui_window_name, mut gui_window) in &mut self.gui_windows {
+        let full_output = self.state.egui_ctx().run(raw_input, |_ui| {
+            for (_, gui_window) in &mut self.gui_windows {
                 gui_window.show(&self.state.egui_ctx());
             }
         });

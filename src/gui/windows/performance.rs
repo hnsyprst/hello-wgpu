@@ -34,7 +34,7 @@ impl GuiWindow for PerformanceWindow {
             .resizable(true)
             .vscroll(true)
             .default_open(true)
-            .show(&ctx, |mut ui| {
+            .show(&ctx, |ui| {
                 egui::Grid::new("performance_info_grid")
                     .num_columns(2)
                     .spacing([40.0, 4.0])
