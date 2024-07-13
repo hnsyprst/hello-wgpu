@@ -10,9 +10,9 @@ anyhow = "1.0"
 bytemuck = { version = "1.12", features = [ "derive" ] }
 cfg-if = "1" # Makes platform-specific code more manageable
 cgmath = "0.18"
-egui = "0.24"
-egui-winit = { version = "0.24", default-features = false }
-egui-wgpu = "0.24"
+egui = "0.26.0"
+egui-wgpu = { version = "0.26.0", features = [ "winit" ] }
+egui-winit = { version = "0.26.0", default-features = false }
 env_logger = "0.10"
 log = "0.4"
 pollster = "0.3"
@@ -20,13 +20,13 @@ rand = "0.8"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 tobj = { version = "3.2.1", features = [ "async" ] }
-winit = "0.28"
-wgpu = "0.18"
+winit = "0.29"
+wgpu = "0.19"
 
 [dependencies.image]
 version = "0.24"
 default-features = false
-features = ["png", "jpeg"]
+features = [ "png", "jpeg" ]
 
 [build-dependencies]
 anyhow = "1.0"
@@ -46,7 +46,9 @@ web-sys = { version = "0.3", features = [ # Bindings for JS Web APIs
     "Location",
     "Clipboard",
 ]} 
-wgpu = { version = "0.18", features = [ "webgl" ] } # Using the WebGL feature, try WebGPU later
+wgpu = { version = "0.19", features = [ "webgpu" ] }
+getrandom = { version = "0.2", features = [ "js" ] } # Generates random numbers in JS, see https://github.com/rust-random/getrandom#
+web-time = "1.1"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
