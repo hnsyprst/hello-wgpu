@@ -1,14 +1,18 @@
 use std::sync::Arc;
+use std::collections::HashMap;
+
 use egui::*;
 use egui_wgpu::{Renderer, ScreenDescriptor};
 use wgpu::{CommandEncoder, Device, Queue, StoreOp, TextureFormat, TextureView};
 use winit::event::WindowEvent;
-use winit::window::Window;
+use winit;
+
+use super::windows::GuiWindow;
 
 pub struct EguiRenderer {
     state: egui_winit::State,
     renderer: Renderer,
-    window: Arc<Window>,
+    window: Arc<winit::window::Window>,
     pub screen_descriptor: ScreenDescriptor,
 }
 
@@ -18,7 +22,7 @@ impl EguiRenderer {
         output_color_format: TextureFormat,
         output_depth_format: Option<TextureFormat>,
         msaa_samples: u32,
-        window: Arc<Window>,
+        window: Arc<winit::window::Window>,
         screen_descriptor: ScreenDescriptor,
     ) -> EguiRenderer {
         let egui_context = Context::default();
@@ -64,7 +68,7 @@ impl EguiRenderer {
         queue: &Queue,
         encoder: &mut CommandEncoder,
         view: &TextureView,
-        run_ui: impl FnOnce(&Context),
+        gui_windows: &mut HashMap<String, Box<dyn GuiWindow>>,
     ) {
         self.state
             .egui_ctx()
@@ -72,7 +76,9 @@ impl EguiRenderer {
 
         let raw_input = self.state.take_egui_input(&self.window);
         let full_output = self.state.egui_ctx().run(raw_input, |ui| {
-            run_ui(&self.state.egui_ctx());
+            for (gui_window_name, mut gui_window) in gui_windows {
+                gui_window.show(&self.state.egui_ctx());
+            }
         });
 
         self.state

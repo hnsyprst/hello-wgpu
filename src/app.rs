@@ -5,7 +5,7 @@ use std::time::Instant;
 use web_time::Instant;
 use log::{debug, error, log_enabled, info, Level};
 
-use crate::gui;
+use crate::gui::renderer::EguiRenderer;
 
 use egui_wgpu::ScreenDescriptor;
 
@@ -16,7 +16,6 @@ use winit::{
     event_loop::EventLoop,
     window::WindowBuilder,
 };
-
 
 pub type WindowEventFn<T> = fn(app_data: &mut AppData, state: &mut T, window_event: &WindowEvent);
 pub type ResizeFn<T> = fn(app_data: &mut AppData, state: &mut T, size: (u32, u32));
@@ -41,7 +40,7 @@ pub struct AppData {
 
     pub surface: wgpu::Surface<'static>,
 
-    pub egui_renderer: gui::EguiRenderer,
+    pub egui_renderer: EguiRenderer,
 }
 
 impl AppData {
@@ -113,7 +112,7 @@ impl AppData {
             pixels_per_point: window.scale_factor() as f32,
         };
         
-        let mut egui_renderer = gui::EguiRenderer::new(
+        let mut egui_renderer = EguiRenderer::new(
             &device,
             config.format,
             None,
