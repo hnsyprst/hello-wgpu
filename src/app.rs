@@ -4,6 +4,7 @@ use std::time::Instant;
 #[cfg(target_arch="wasm32")]
 use web_time::Instant;
 use log::{debug, error, log_enabled, info, Level};
+use wgpu::TextureFormat;
 
 use crate::gui::renderer::EguiRenderer;
 
@@ -89,14 +90,13 @@ impl AppData {
 
         // Setting up `config`` defining how the surface creates `SurfaceTexture`s
         let surface_capabilities = surface.get_capabilities(&adapter);
+        error!("surface_capabilities {:?}", surface_capabilities.formats.iter());
         let surface_format = surface_capabilities.formats.iter()
-            .copied()
-            .filter(|f| f.is_srgb())
-            .next()
-            .unwrap_or(surface_capabilities.formats[0]);
-        let config = wgpu::SurfaceConfiguration {
+            .find(|f| **f == TextureFormat::Bgra8UnormSrgb)
+            .unwrap_or(&surface_capabilities.formats[0]);
+        let mut config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
+            format: *surface_format,
             width: size.width,
             height: size.height,
             present_mode: surface_capabilities.present_modes[0], // Play with this or enable runtime selection. PresentMode::Fifo is guaranteed to be supported on all platforms and is essentially VSync
@@ -105,6 +105,8 @@ impl AppData {
             view_formats: vec![],
             desired_maximum_frame_latency: 2, // TODO: Look into this
         };
+        let view_format = config.format.add_srgb_suffix();
+        config.view_formats.push(view_format);
         surface.configure(&device, &config);
 
         let screen_descriptor = ScreenDescriptor {
@@ -114,7 +116,7 @@ impl AppData {
         
         let egui_renderer = EguiRenderer::new(
             &device,
-            config.format,
+            config.view_formats[0],
             None,
             1,
             Arc::clone(&window),
@@ -193,7 +195,10 @@ impl<T: 'static> App<T> {
     ) -> Result<(), wgpu::SurfaceError> {
         // Get a frame to render to
         let output = self.app_data.surface.get_current_texture()?;
-        let view: wgpu::TextureView = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view: wgpu::TextureView = output.texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.app_data.config.view_formats[0]),
+            ..wgpu::TextureViewDescriptor::default()
+        });
         // Create a `CommandEncoder` to create the store commands in a command buffer that will be sent to the GPU
         let encoder = self.app_data.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
