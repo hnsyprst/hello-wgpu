@@ -1,4 +1,4 @@
-use hello_wgpu::run;
+use instancing::run;
 
 fn main() {
     println!("Hello, window!");
