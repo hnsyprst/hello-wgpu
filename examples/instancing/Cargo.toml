@@ -1,56 +1,24 @@
 [package]
-name = "hello-wgpu"
+name = "instancing"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-anyhow.workspace = true
-bytemuck.workspace = true
+hello-wgpu.workspace = true
 cfg-if.workspace = true
 cgmath.workspace = true
-egui.workspace = true
-egui-wgpu.workspace = true
-egui-winit.workspace = true
-env_logger.workspace = true
 log.workspace = true
 pollster.workspace = true
 rand.workspace = true
 serde.workspace = true
-serde_json.workspace = true
-tobj.workspace = true
 winit.workspace = true
+env_logger.workspace = true
 wgpu.workspace = true
 
-[workspace]
-members = [
-    "examples/*",
-]
-
-[workspace.dependencies]
-hello-wgpu = { version = "0.1.0", path = "." }
+[build-dependencies]
 anyhow = "1.0"
-bytemuck = { version = "1.12", features = [ "derive" ] }
-cfg-if = "1" # Makes platform-specific code more manageable
-cgmath = "0.18"
-egui = "0.26.0"
-egui-wgpu = { version = "0.26.0", features = [ "winit" ] }
-egui-winit = { version = "0.26.0", default-features = false }
-env_logger = "0.10"
-log = "0.4"
-pollster = "0.3"
-rand = "0.8"
-serde = { version = "1.0", features = [ "derive" ] }
-serde_json = "1.0"
-tobj = { version = "3.2.1", features = [ "async" ] }
-winit = "0.29"
-wgpu = "0.19"
-
-[dependencies.image]
-version = "0.24"
-default-features = false
-features = [ "png", "jpeg" ]
+fs_extra = "1.2"
+glob = "0.3"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6" # Configures the `panic!` macro to send errors to the JS console
