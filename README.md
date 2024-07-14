@@ -1,3 +1,5 @@
-To target wasm (used by index.html), build with wasm-pack (https://rustwasm.github.io/wasm-pack/installer/):
-1. `wasm-pack build --target web --out_dir web/pkg`
-2. copy index.html and /res into /web
+# hello-wgpu
+
+A small work-in-progress graphics engine for web and native, built using [wgpu](https://wgpu.rs/).
+
+![GIF showing screen recording of example output](examples/instancing/img/output_small.gif)
