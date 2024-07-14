@@ -65,4 +65,16 @@ impl GuiWindow for PerformanceWindow {
             self.update_time = performance_event.update_time;
         }
     }
+
+    fn get_state_event(
+        &self,
+    ) -> Box::<SendAny> {
+        Box::new(
+            PerformanceEvent {
+                fps: self.fps,
+                render_time: self.render_time,
+                update_time: self.update_time,
+            }
+        )
+    }
 }

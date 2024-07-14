@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello wgpu</title>
+    <style type="text/css">
+        :focus {
+            outline: none;
+        }
+        html, body {
+            font-size: .8rem;
+        }
+
+        html {
+            min-height: 100%;
+            position: relative;
+        }
+
+        body {
+            height: 100%;
+            color: white;
+            background-color: blue;
+            padding: 0;
+            margin: 0;
+        }
+
+        #container {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+
+<body id="wasm-example">
+  <div id="container">
+    <canvas class="main-canvas" id="canvas"></canvas>
+  </div>
+  <script type="module">
+      import init from "./pkg/collision_detection.js";
+      init().then(() => {
+          console.log("WASM Loaded");
+      });
+  </script>
+</body>
+
+</html>

@@ -13,4 +13,8 @@ pub trait GuiWindow {
         &mut self,
         event: &SendAny,
     );
+
+    fn get_state_event(
+        &self,
+    ) -> Box::<SendAny>;
 }

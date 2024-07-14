@@ -49,4 +49,14 @@ impl GuiWindow for StatsWindow {
             self.num_instances = stats_event.num_instances;
         }
     }
+
+    fn get_state_event(
+        &self,
+    ) -> Box::<SendAny> {
+        Box::new(
+            StatsEvent {
+                num_instances: self.num_instances,
+            }
+        )
+    }
 }

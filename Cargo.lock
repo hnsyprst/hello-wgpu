@@ -338,6 +338,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "collision-detection"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cfg-if",
+ "cgmath",
+ "console_error_panic_hook",
+ "console_log",
+ "egui",
+ "env_logger",
+ "fs_extra",
+ "getrandom",
+ "glob",
+ "hello-wgpu",
+ "log",
+ "pollster",
+ "rand",
+ "reqwest",
+ "serde",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "web-time 1.1.0",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

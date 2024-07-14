@@ -73,6 +73,16 @@ impl EguiRenderer {
             .update(event);
     }
 
+    pub fn receive_event(
+        &mut self,
+        gui_window_name: &str,
+    ) -> Box::<SendAny> {
+        self.gui_windows
+            .get_mut(gui_window_name)
+            .unwrap()
+            .get_state_event()
+    }
+
     pub fn handle_input(
         &mut self,
         event: &WindowEvent,
