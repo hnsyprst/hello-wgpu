@@ -4,6 +4,7 @@ use cube_settings_gui::CubeSettingsEvent;
 use hello_wgpu::model::Material;
 use hello_wgpu::model::Model;
 use hello_wgpu::primitives;
+use hello_wgpu::primitives::Meshable;
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch="wasm32")]
@@ -73,19 +74,17 @@ impl State {
         let wireframe_object = {
             let model = Model {
                 meshes: vec![
-                    primitives::build_mesh( 
-                        primitives::create_cuboid(
-                            "cube",
-                            cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 }
-                        ),
-                        &app_data.device,
-                    )
+                    primitives::Cuboid::new(
+                        "cube",
+                        cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 }
+                    ).build_mesh(&app_data.device),
                 ],
-                materials: vec![Material::default(
-                    &app_data.device,
-                    &app_data.queue,
-                    &phong_pass.texture_bind_group_layout,
-                )],
+                materials: vec![
+                    Material::default(
+                        &app_data.device,
+                        &app_data.queue,
+                        &phong_pass.texture_bind_group_layout,
+                    )],
             };
             let instance = Instance { position: cgmath::Vector3 { x: 5.0, y: 5.0, z: 1.0 }, rotation: cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0)), rotation_speed: 0.0 };
             object::Object{ model, instances: vec![instance] }

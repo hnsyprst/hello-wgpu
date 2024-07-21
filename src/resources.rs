@@ -157,9 +157,9 @@ pub async fn load_model(
 
     let meshes = models.into_iter().map(|m| {
         let vertices = vertex::vecs_to_model_vertices(
-            m.mesh.positions.chunks(3).map(|p| [p[0], p[1], p[2]]).collect::<Vec<_>>(),
-            m.mesh.normals.chunks(3).map(|p| [p[0], p[1], p[2]]).collect::<Vec<_>>(),
-            m.mesh.texcoords.chunks(2).map(|p| [p[0], 1.0 - p[1]]).collect::<Vec<_>>(),
+            &m.mesh.positions.chunks(3).map(|p| [p[0], p[1], p[2]]).collect::<Vec<_>>(),
+            &m.mesh.normals.chunks(3).map(|p| [p[0], p[1], p[2]]).collect::<Vec<_>>(),
+            &m.mesh.texcoords.chunks(2).map(|p| [p[0], 1.0 - p[1]]).collect::<Vec<_>>(),
             &m.mesh.indices,
         );
 

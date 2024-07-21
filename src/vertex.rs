@@ -51,9 +51,9 @@ impl Vertex for ModelVertex {
 }
 
 pub fn vecs_to_model_vertices(
-    positions: Vec<[f32; 3]>,
-    normals: Vec<[f32; 3]>,
-    uvs: Vec<[f32; 2]>,
+    positions: &Vec<[f32; 3]>,
+    normals: &Vec<[f32; 3]>,
+    uvs: &Vec<[f32; 2]>,
     indices: &Vec<u32>,
 ) -> Vec<ModelVertex> {
     let mut vertices = positions
@@ -61,9 +61,9 @@ pub fn vecs_to_model_vertices(
         .zip(normals.into_iter())
         .zip(uvs.into_iter())
         .map(|((position, normal), uv)| ModelVertex {
-            position,
-            tex_coords: uv,
-            normal,
+            position: *position,
+            tex_coords: *uv,
+            normal: *normal,
             // We'll calculate these later, just set to 0 for now
             tangent: [0.0; 3],
             bitangent: [0.0; 3],

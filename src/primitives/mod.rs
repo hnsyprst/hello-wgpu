@@ -1,7 +1,14 @@
 use wgpu::util::DeviceExt;
 use crate::{mesh::Mesh, vertex};
 
-pub struct Primitive {
+pub trait Meshable {
+    fn build_mesh(
+        &self,
+        device: &wgpu::Device
+    ) -> Mesh;
+}
+
+pub struct Cuboid {
     name: String,
     positions: Vec<[f32; 3]>,
     normals: Vec<[f32; 3]>,
@@ -9,41 +16,12 @@ pub struct Primitive {
     indices: Vec<u32>,
 }
 
-pub fn build_mesh(
-    primitive: Primitive,
-    device: &wgpu::Device,
-) -> Mesh {
-    let vertices = vertex::vecs_to_model_vertices(
-        primitive.positions,
-        primitive.normals,
-        primitive.uvs,
-        &primitive.indices);
-
-    let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some(&format!("{:?} Vertex Buffer", primitive.name)),
-        contents: bytemuck::cast_slice(&vertices),
-        usage: wgpu::BufferUsages::VERTEX,
-    });
-    let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some(&format!("{:?} Index Buffer", primitive.name)),
-        contents: bytemuck::cast_slice(&primitive.indices),
-        usage: wgpu::BufferUsages::INDEX,
-    });
-
-    Mesh {
-        name: primitive.name,
-        vertex_buffer: vertex_buffer,
-        index_buffer: index_buffer,
-        num_elements: primitive.indices.len() as u32,
-        material: 0,
-    }
-}
-
 // Build a cuboid, assuming that the cuboid is centered around the origin
-pub fn create_cuboid(
-    name: &str,
-    half_size: cgmath::Vector3<f32>, // Vector describing half the size of the cuboid
-) -> Primitive {
+impl Cuboid {
+    pub fn new(
+        name: &str,
+        half_size: cgmath::Vector3<f32>, // Vector describing half the size of the cuboid
+    ) -> Self {
     let min = -half_size;
     let max = half_size;
     
@@ -101,11 +79,44 @@ pub fn create_cuboid(
         face_normals[i / 4]
     }).collect::<Vec<_>>();
 
-    Primitive {
+    Self {
         name: name.to_string(),
         positions,
         normals,
         uvs,
         indices,
+    }
+    }
+}
+
+impl Meshable for Cuboid {
+    fn build_mesh(
+        &self,
+        device: &wgpu::Device,
+    ) -> Mesh {
+        let vertices = vertex::vecs_to_model_vertices(
+            &self.positions,
+            &self.normals,
+            &self.uvs,
+            &self.indices);
+    
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(&format!("{:?} Vertex Buffer", self.name)),
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(&format!("{:?} Index Buffer", self.name)),
+            contents: bytemuck::cast_slice(&self.indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+    
+        Mesh {
+            name: self.name.to_string(),
+            vertex_buffer: vertex_buffer,
+            index_buffer: index_buffer,
+            num_elements: self.indices.len() as u32,
+            material: 0,
+        }
     }
 }
