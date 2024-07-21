@@ -180,7 +180,7 @@ impl PhongPass {
     }
 }
 
-impl RenderPass for PhongPass {
+impl RenderPass<Object> for PhongPass {
     fn draw(
         &mut self,
         app_data: &AppData,

@@ -15,6 +15,7 @@ mod cube_settings_gui;
 use hello_wgpu::{
     app,
     camera,
+    debug,
     texture,
     render_pass,
     object,
@@ -33,8 +34,8 @@ use winit::{event::WindowEvent, event_loop::EventLoop};
 struct State {
     phong_pass: render_pass::phong::PhongPass,
     phong_objects: Vec<object::Object>,
-    // wireframe_pass: render_pass::wireframe::WireframePass,
-    // wireframe_objects: Vec<object::Object>,
+    line_pass: render_pass::line::LinePass,
+    lines: Vec<debug::line::Line>,
     depth_texture: texture::Texture,
     camera: camera::Camera,
     camera_controller: camera::CameraController,
@@ -58,7 +59,7 @@ impl State {
         let camera_controller = camera::CameraController::new(0.2);
 
         let phong_pass = render_pass::phong::PhongPass::new(&app_data.device, &app_data.queue, &app_data.config, &camera);
-        // let wireframe_pass = render_pass::wireframe::WireframePass::new(&app_data.device, &app_data.queue, &app_data.config, &camera);
+        let line_pass = render_pass::line::LinePass::new(&app_data.device, &app_data.queue, &app_data.config, &camera);
 
         // Load models
         let cube_model = resources::load_model("cube.obj", &app_data.device, &app_data.queue, &phong_pass.texture_bind_group_layout, Some(env!("OUT_DIR"))).await.unwrap();
@@ -71,7 +72,7 @@ impl State {
             Instance { position, rotation, rotation_speed: 0.0 }
         }).collect::<Vec<_>>();
         
-        let wireframe_object = {
+        let primitive_cuboid_object = {
             let model = Model {
                 meshes: vec![
                     primitives::cuboid::Cuboid::new(
@@ -91,9 +92,20 @@ impl State {
         };
         let phong_objects = vec![
             object::Object{ model: cube_model, instances: cube_instances },
-            wireframe_object,
+            primitive_cuboid_object,
         ];
         let depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "Depth Texture");
+
+        let lines = vec![
+            debug::line::Line::new(
+                "debug_line",
+                vec![
+                    [-9.0, 9.0, 0.0],
+                    [-3.0, -0.0, 0.0],
+                ],
+                &app_data.device,
+            ),
+        ];
 
         app_data.egui_renderer.add_gui_window("performance", Box::new(gui::windows::performance::PerformanceWindow::new()));
         app_data.egui_renderer.add_gui_window("stats", Box::new(gui::windows::stats::StatsWindow::new()));
@@ -102,8 +114,8 @@ impl State {
         Self {
             phong_pass,
             phong_objects,
-            // wireframe_pass,
-            // wireframe_objects,
+            line_pass,
+            lines,
             depth_texture,
             camera,
             camera_controller,
@@ -177,6 +189,13 @@ fn render(
         &view,
         encoder,
         &state.phong_objects,
+        Some(&state.depth_texture),
+    ).unwrap();
+    encoder = state.line_pass.draw(
+        app_data,
+        &view,
+        encoder,
+        &state.lines,
         Some(&state.depth_texture),
     ).unwrap();
 

@@ -1,36 +1,22 @@
 use std::collections::HashMap;
 use crate::{
-    app::AppData,
-    camera::{
+    app::AppData, camera::{
         self,
         Camera,
         CameraUniform,
-    },
-    instance,
-    light,
-    model::{
-        self,
-        DrawLight,
-    },
-    object::Object,
-    texture::Texture,
-    vertex::{self, Vertex},
+    }, debug::{self, line::{Line, Vertex}}, texture::Texture
 };
 use super::RenderPass;
 use wgpu::util::DeviceExt;
-
-pub struct BasicPass {
+pub struct LinePass {
     pub camera_uniform: CameraUniform,
     camera_uniform_buffer: wgpu::Buffer,
-    pub light_uniform: light::LightUniform,
-    light_uniform_buffer: wgpu::Buffer,
     pub global_bind_group_layout: wgpu::BindGroupLayout,
     pub global_bind_group: wgpu::BindGroup,
     pub render_pipeline: wgpu::RenderPipeline,
-    pub instance_buffers: HashMap<usize, wgpu::Buffer>,
 }
 
-impl BasicPass {
+impl LinePass {
     pub fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -38,13 +24,13 @@ impl BasicPass {
         camera: &Camera,
         // TODO: Lights could be passed in here instead like the camera
     ) -> Self {
-        let basic_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
-            label: Some("Basic Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/basic.wgsl").into()),
+        let line_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { 
+            label: Some("Line Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/line.wgsl").into()),
         });
 
         let global_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Basic Globals Layout"),
+            label: Some("Line Globals Layout"),
             entries: &[
                 // Camera
                 wgpu::BindGroupLayoutEntry {
@@ -57,17 +43,6 @@ impl BasicPass {
                     },
                     count: None,
                 },
-                // Lights
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }, 
             ]
         });
         // Set up camera and create buffer
@@ -80,50 +55,33 @@ impl BasicPass {
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             }
         );
-        // Set up lighting and create buffer
-        let light_uniform = light::LightUniform {
-            position: [10.0, 10.0, 10.0],
-            _padding: 0,
-            color: [1.0, 1.0, 1.0],
-            _padding2: 0,
-        };
-        let light_uniform_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Basic Light Buffer"),
-                contents: bytemuck::cast_slice(&[light_uniform]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }
-        );
         let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Basic Globals"),
+            label: Some("Line Globals"),
             layout: &global_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: camera_uniform_buffer.as_entire_binding(),
                 },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: light_uniform_buffer.as_entire_binding(),
-                },
             ]
         });
+
         // Set up render pipeline
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
-            label: Some("Basic Render Pipeline Layout"),
+            label: Some("Line Render Pipeline Layout"),
             bind_group_layouts: &[&global_bind_group_layout],
             push_constant_ranges: &[],
         });
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor { 
-            label: Some("Basic Render Pipeline"),
+            label: Some("Line Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &basic_shader,
+                module: &line_shader,
                 entry_point: "vs_main",
-                buffers: &[vertex::ModelVertex::describe(), instance::RawInstance::describe()],
+                buffers: &[debug::line::LineVertex::describe()],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &basic_shader,
+                module: &line_shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.view_formats[0],
@@ -132,7 +90,7 @@ impl BasicPass {
                 })],
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList, // Every three vertices will correspond to one triangle
+                topology: wgpu::PrimitiveTopology::LineList, // Every three vertices will correspond to one triangle
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw, // Tris are facing forward if vertices are arranged in counter-clockwise order
                 cull_mode: Some(wgpu::Face::Back), // Tris not facing forward should be culled
@@ -159,45 +117,33 @@ impl BasicPass {
             multiview: None,
         });
 
-        let instance_buffers = HashMap::new();
-
         Self {
             camera_uniform,
             camera_uniform_buffer,
-            light_uniform,
-            light_uniform_buffer,
             global_bind_group_layout,
             global_bind_group,
             render_pipeline,
-            instance_buffers,
         }
     }
 }
 
-impl RenderPass<Object> for BasicPass {
+impl RenderPass<Line> for LinePass {
     fn draw(
         &mut self,
         app_data: &AppData,
         view: &wgpu::TextureView,
         mut encoder: wgpu::CommandEncoder,
-        objects: &Vec<Object>,
+        objects: &Vec<Line>,
         depth_texture: Option<&Texture>,
     ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
         // Create a `RenderPass` to clear and render the frame
-        let clear_color = wgpu::Color {
-            r: 0.1,
-            g: 0.2,
-            b: 0.3,
-            a: 1.0,
-        };
 
         app_data.queue.write_buffer(&self.camera_uniform_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
-        app_data.queue.write_buffer(&self.light_uniform_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Basic Render Pass"),
+            label: Some("Line Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view, // Render to the view created above (the output texture)
+                view: view, // Render to the view created above (the output texture)
                 resolve_target: None, // The same as `view` unless multisampling is enabled
                 ops: wgpu::Operations {
                     // Load tells wgpu what to do with colours stored from the previous frame (here we're just clearing them to a specified colour)
@@ -221,27 +167,9 @@ impl RenderPass<Object> for BasicPass {
         render_pass.set_pipeline(&self.render_pipeline);
 
         for (object_idx, object) in objects.iter().enumerate() {
-            let create_instance_buffer = || {
-                let instance_data = object.instances.iter().map(instance::Instance::to_raw).collect::<Vec<_>>();
-                app_data.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Basic Instance Buffer"),
-                        contents: bytemuck::cast_slice(&instance_data),
-                        usage: wgpu::BufferUsages::VERTEX,
-                })
-            };
-            self.instance_buffers
-                .entry(object_idx)
-                .and_modify(|value| {*value = create_instance_buffer()})
-                .or_insert_with(create_instance_buffer);
-        }
-
-        for (object_idx, object) in objects.iter().enumerate() {
-            render_pass.set_vertex_buffer(1, self.instance_buffers[&object_idx].slice(..));
-            render_pass.draw_light_model_instanced(
-                &object.model,
-                0..object.instances.len() as u32,
-                &self.global_bind_group,
-            );
+            render_pass.set_vertex_buffer(0, object.vertex_buffer.slice(..));
+            render_pass.set_bind_group(0, &self.global_bind_group, &[]);
+            render_pass.draw(0..object.num_vertices, 0..1);
         }
         
         drop(render_pass); // Need to drop `render_pass` to release the mutable borrow of `encoder` so we can call `encoder.finish()`
