@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use hello_wgpu::model::Model;
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch="wasm32")]
@@ -36,9 +37,9 @@ struct Song {
 
 struct State {
     basic_pass: render_pass::basic::BasicPass,
-    basic_objects: Vec<object::Object>,
+    basic_objects: Vec<object::Object<Model>>,
     phong_pass: render_pass::phong::PhongPass,
-    phong_objects: Vec<object::Object>,
+    phong_objects: Vec<object::Object<Model>>,
     depth_texture: texture::Texture,
     camera: camera::Camera,
     camera_controller: camera::CameraController,

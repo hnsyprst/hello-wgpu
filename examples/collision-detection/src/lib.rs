@@ -1,16 +1,22 @@
 use std::sync::Arc;
 
-use cube_settings_gui::CubeSettingsEvent;
+use controls_gui::CollisionEvent;
+use controls_gui::ControlsEvent;
+use controls_gui::StateEvent;
+use hello_wgpu::collision;
+use hello_wgpu::debug::line::Line;
 use hello_wgpu::model::Material;
 use hello_wgpu::model::Model;
+use hello_wgpu::object::Object;
 use hello_wgpu::primitives;
+use hello_wgpu::primitives::cuboid::Cuboid;
 use hello_wgpu::primitives::Meshable;
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen_futures::js_sys::Math::random;
 
-mod cube_settings_gui;
+mod controls_gui;
 
 use hello_wgpu::{
     app,
@@ -32,13 +38,13 @@ use cgmath::Rotation3;
 use winit::{event::WindowEvent, event_loop::EventLoop};
 
 struct State {
-    phong_pass: render_pass::phong::PhongPass,
-    phong_objects: Vec<object::Object>,
     line_pass: render_pass::line::LinePass,
-    lines: Vec<debug::line::Line>,
+    cuboid_objects: Vec<Object<Line>>,
+    colliders: Vec<collision::aabb::AxisAlignedBoundingBox>,
     depth_texture: texture::Texture,
     camera: camera::Camera,
     camera_controller: camera::CameraController,
+    clear_color: Option<wgpu::Color>,
 }
 
 impl State {
@@ -47,7 +53,7 @@ impl State {
     ) -> Self {
         // Set up camera
         let camera = camera::Camera::new(
-            cgmath::Point3::new(0.0, 10.0, 20.0),
+            cgmath::Point3::new(0.0, 10.0, 30.0),
             cgmath::Point3::new(0.0, 0.0, 0.0),
             cgmath::Vector3::unit_y(),
             app_data.config.width as f32 / app_data.config.height as f32,
@@ -58,66 +64,65 @@ impl State {
         
         let camera_controller = camera::CameraController::new(0.2);
 
-        let phong_pass = render_pass::phong::PhongPass::new(&app_data.device, &app_data.queue, &app_data.config, &camera);
-        let line_pass = render_pass::line::LinePass::new(&app_data.device, &app_data.queue, &app_data.config, &camera);
+        let line_pass = render_pass::line::LinePass::new(
+            &app_data.device,
+            &app_data.queue,
+            &app_data.config,
+            &camera,
+        );
 
-        // Load models
-        let cube_model = resources::load_model("cube.obj", &app_data.device, &app_data.queue, &phong_pass.texture_bind_group_layout, Some(env!("OUT_DIR"))).await.unwrap();
+        // Set up instances for line pass
+        let half_size = cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 };
 
-        // Set up instances for phong pass
-        const SPACE_BETWEEN: f32 = 5.0;
-        let cube_instances = (0..2).map(|x| {
-            let position = cgmath::Vector3 { x: x as f32 * SPACE_BETWEEN + 1.0 , y: 0.0, z: x as f32 * SPACE_BETWEEN + 1.0 };
-            let rotation = cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0));
+        let cuboid = Cuboid::new(
+            "cube",
+            half_size,
+        );
+
+        let cuboid_model = Line::from_cuboid(
+            &cuboid.name,
+            &cuboid,
+            &app_data.device,
+        );
+
+        let cuboid_instances = (0..2).map(|x| {
+            let position = cgmath::Vector3 { x: (x as f32 * 10.0) - 5.0, y: 1.0, z: 1.0 };
+            let rotation = cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0));
             Instance { position, rotation, rotation_speed: 0.0 }
         }).collect::<Vec<_>>();
 
-        let cuboid = primitives::cuboid::Cuboid::new(
-            "cube",
-            cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 }
-        );
-        
-        let primitive_cuboid_object = {
-            let model = Model {
-                meshes: vec![
-                    cuboid.build_mesh(&app_data.device),
-                ],
-                materials: vec![
-                    Material::default(
-                        &app_data.device,
-                        &app_data.queue,
-                        &phong_pass.texture_bind_group_layout,
-                    )],
-            };
-            let instance = Instance { position: cgmath::Vector3 { x: 5.0, y: 5.0, z: 1.0 }, rotation: cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0)), rotation_speed: 0.0 };
-            object::Object{ model, instances: vec![instance] }
-        };
-        let phong_objects = vec![
-            object::Object{ model: cube_model, instances: cube_instances },
-            primitive_cuboid_object,
-        ];
-        let depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "Depth Texture");
+        let colliders = cuboid_instances.iter().map(|instance| {
+            collision::aabb::AxisAlignedBoundingBox::new(
+                -half_size + instance.position,
+                half_size + instance.position,
+            )
+        }).collect::<Vec<_>>();
 
-        let lines = vec![
-            debug::line::Line::from_cuboid(
-                "cuboid",
-                &cuboid,
-                &app_data.device,
-            ),
+        let cuboid_objects = vec![
+            Object { model: cuboid_model, instances: cuboid_instances },
         ];
+
+        let depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "Depth Texture");
 
         app_data.egui_renderer.add_gui_window("performance", Box::new(gui::windows::performance::PerformanceWindow::new()));
         app_data.egui_renderer.add_gui_window("stats", Box::new(gui::windows::stats::StatsWindow::new()));
-        app_data.egui_renderer.add_gui_window("cube_settings", Box::new(cube_settings_gui::CubeSettingsWindow::new(phong_objects[0].instances[0].position)));
+        app_data.egui_renderer.add_gui_window("controls", Box::new(controls_gui::ControlsWindow::new(cuboid_objects[0].instances[0].position)));
         
+        let clear_color = Some(wgpu::Color {
+                r: 0.1,
+                g: 0.2,
+                b: 0.5,
+                a: 1.0,
+        });
+
         Self {
-            phong_pass,
-            phong_objects,
             line_pass,
-            lines,
+            cuboid_objects,
+            colliders,
             depth_texture,
             camera,
             camera_controller,
+            clear_color,
         }
     }
 }
@@ -147,18 +152,28 @@ fn update(
     state: &mut State,
 ) {
     // Move instances
-    if let Some(cube_settings_event) = app_data.egui_renderer.receive_event("cube_settings").downcast_ref::<CubeSettingsEvent>() {
-        let position = cube_settings_event.position;
-        state.phong_objects[0].instances[0] = Instance {
+    if let Some(controls_event) = app_data.egui_renderer.receive_event("controls").downcast_ref::<StateEvent>() {
+        let position = controls_event.position;
+        state.cuboid_objects[0].instances[0] = Instance {
             position,
-            rotation: state.phong_objects[0].instances[0].rotation,
-            rotation_speed: state.phong_objects[0].instances[0].rotation_speed,
+            rotation: state.cuboid_objects[0].instances[0].rotation,
+            rotation_speed: state.cuboid_objects[0].instances[0].rotation_speed,
         }
     };
 
+    state.colliders = state.cuboid_objects.iter().flat_map(|object| {
+        object.instances.iter().map(move |instance| {
+            let position = instance.position;
+            let half_size = cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 };
+            collision::aabb::AxisAlignedBoundingBox::new(
+                -half_size + position,
+                half_size + position,
+            )
+        })
+    }).collect::<Vec<_>>();
+
     // Move camera
     state.camera_controller.update_camera(&mut state.camera);
-    state.phong_pass.camera_uniform.update_view_proj(&state.camera);
     state.line_pass.camera_uniform.update_view_proj(&state.camera);
 
     // Update GUI
@@ -173,7 +188,13 @@ fn update(
     app_data.egui_renderer.send_event(
         "stats", 
         &StatsEvent {
-            num_instances: state.phong_objects.iter().map(|object| object.instances.len() as u32).sum()
+            num_instances: state.cuboid_objects.iter().map(|object| object.instances.len() as u32).sum()
+        }
+    );
+    app_data.egui_renderer.send_event(
+        "controls", 
+        &CollisionEvent {
+            is_colliding: state.colliders[0].is_aabb_colliding(&state.colliders[1])
         }
     );
 }
@@ -184,19 +205,13 @@ fn render(
     view: wgpu::TextureView,
     mut encoder: wgpu::CommandEncoder,
 ) {
-    encoder = state.phong_pass.draw(
-        app_data,
-        &view,
-        encoder,
-        &state.phong_objects,
-        Some(&state.depth_texture),
-    ).unwrap();
     encoder = state.line_pass.draw(
         app_data,
         &view,
         encoder,
-        &state.lines,
+        &state.cuboid_objects,
         Some(&state.depth_texture),
+        &state.clear_color,
     ).unwrap();
 
     app_data.egui_renderer.draw(

@@ -11,7 +11,7 @@ use crate::{
     model::{
         self,
         DrawModel,
-        Material,
+        Material, Model,
     },
     object:: Object,
     texture::Texture,
@@ -180,13 +180,13 @@ impl PhongPass {
     }
 }
 
-impl RenderPass<Object> for PhongPass {
+impl RenderPass<Object<Model>> for PhongPass {
     fn draw(
         &mut self,
         app_data: &AppData,
         view: &wgpu::TextureView,
         mut encoder: wgpu::CommandEncoder,
-        objects: &Vec<Object>,
+        objects: &Vec<Object<Model>>,
         depth_texture: Option<&Texture>,
         clear_color: &Option<wgpu::Color>,
     ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
@@ -227,6 +227,7 @@ impl RenderPass<Object> for PhongPass {
         });
         render_pass.set_pipeline(&self.render_pipeline);
 
+        // Update instance buffer if necessary
         for (object_idx, object) in objects.iter().enumerate() {
             let create_instance_buffer = || {
                 let instance_data = object.instances.iter().map(instance::Instance::to_raw).collect::<Vec<_>>();
@@ -242,6 +243,7 @@ impl RenderPass<Object> for PhongPass {
                 .or_insert_with(create_instance_buffer);
         }
 
+        // Draw instances for all objects
         for (object_idx, object) in objects.iter().enumerate() {
             render_pass.set_vertex_buffer(1, self.instance_buffers[&object_idx].slice(..));
             render_pass.draw_model_instanced(

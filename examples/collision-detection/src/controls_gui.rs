@@ -4,35 +4,46 @@ use hello_wgpu::gui::SendAny;
 
 use hello_wgpu::gui::windows::GuiWindow;
 
-pub struct CubeSettingsEvent {
+pub struct ControlsEvent {
     pub position: Vector3<f32>,
 }
 
-pub struct CubeSettingsWindow {
-    pub position: Vector3<f32>,
+pub struct CollisionEvent {
+    pub is_colliding: bool,
 }
 
-impl CubeSettingsWindow {
+pub struct StateEvent {
+    pub position: Vector3<f32>,
+    pub is_colliding: bool,
+}
+
+pub struct ControlsWindow {
+    pub position: Vector3<f32>,
+    pub is_colliding: bool,
+}
+
+impl ControlsWindow {
     pub fn new(
         position: Vector3<f32>,
     ) -> Self {
         Self {
             position,
+            is_colliding: false,
         }
     }
 }
 
-impl GuiWindow for CubeSettingsWindow {
+impl GuiWindow for ControlsWindow {
     fn show(
         &mut self,
         ctx: &egui::Context,
     ) {
-        egui::Window::new("🧊 Cube")
+        egui::Window::new("⚙ Controls")
             .resizable(true)
             .vscroll(true)
             .default_open(true)
             .show(&ctx, |ui| {
-                egui::Grid::new("cube_settings_grid")
+                egui::Grid::new("controls_grid")
                     .num_columns(2)
                     .spacing([40.0, 4.0])
                     .striped(true)
@@ -52,6 +63,9 @@ impl GuiWindow for CubeSettingsWindow {
                             .speed(0.01)
                         );
                         ui.end_row();
+                        ui.label("Colliding");
+                        ui.label(format!("{}", &self.is_colliding));
+                        ui.end_row();
                     });
             });
     }
@@ -60,8 +74,11 @@ impl GuiWindow for CubeSettingsWindow {
         &mut self,
         event: &SendAny,
     ) {
-        if let Some(cube_settings_event) = event.downcast_ref::<CubeSettingsEvent>() {
-            self.position = cube_settings_event.position;
+        if let Some(controls_event) = event.downcast_ref::<ControlsEvent>() {
+            self.position = controls_event.position;
+        }
+        else if let Some(collision_event) = event.downcast_ref::<CollisionEvent>() {
+            self.is_colliding = collision_event.is_colliding;
         }
     }
 
@@ -69,8 +86,9 @@ impl GuiWindow for CubeSettingsWindow {
         &self,
     ) -> Box<SendAny> {
         Box::new(
-            CubeSettingsEvent {
+            StateEvent {
                 position: self.position,
+                is_colliding: self.is_colliding,
             }
         )
     }

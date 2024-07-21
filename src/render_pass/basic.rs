@@ -10,7 +10,7 @@ use crate::{
     light,
     model::{
         self,
-        DrawLight,
+        DrawLight, Model,
     },
     object::Object,
     texture::Texture,
@@ -174,13 +174,13 @@ impl BasicPass {
     }
 }
 
-impl RenderPass<Object> for BasicPass {
+impl RenderPass<Object<Model>> for BasicPass {
     fn draw(
         &mut self,
         app_data: &AppData,
         view: &wgpu::TextureView,
         mut encoder: wgpu::CommandEncoder,
-        objects: &Vec<Object>,
+        objects: &Vec<Object<Model>>,
         depth_texture: Option<&Texture>,
         clear_color: &Option<wgpu::Color>,
     ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
@@ -221,6 +221,7 @@ impl RenderPass<Object> for BasicPass {
         });
         render_pass.set_pipeline(&self.render_pipeline);
 
+        // Update instance buffer if necessary
         for (object_idx, object) in objects.iter().enumerate() {
             let create_instance_buffer = || {
                 let instance_data = object.instances.iter().map(instance::Instance::to_raw).collect::<Vec<_>>();
@@ -236,6 +237,7 @@ impl RenderPass<Object> for BasicPass {
                 .or_insert_with(create_instance_buffer);
         }
 
+        // Draw instances for all objects
         for (object_idx, object) in objects.iter().enumerate() {
             render_pass.set_vertex_buffer(1, self.instance_buffers[&object_idx].slice(..));
             render_pass.draw_light_model_instanced(

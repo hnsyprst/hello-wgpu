@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use wgpu::util::DeviceExt;
 use crate::{mesh::Mesh, primitives::cuboid::Cuboid, vertex};
 
@@ -75,5 +77,43 @@ impl Line {
             vertex_buffer: vertex_buffer,
             num_vertices: vertices.len() as u32,
         }
+    }
+}
+
+pub trait DrawLine<'a> {
+    fn draw_line(
+        &mut self,
+        line: &'a Line,
+        global_bind_group: &'a wgpu::BindGroup,
+    );
+    fn draw_line_instanced(
+        &mut self,
+        line: &'a Line,
+        instances: Range<u32>,
+        global_bind_group: &'a wgpu::BindGroup,
+    );
+}
+
+impl<'a, 'b> DrawLine<'b> for wgpu::RenderPass<'a>
+where
+    'b: 'a,
+{
+    fn draw_line(
+        &mut self,
+        line: &'b Line,
+        global_bind_group: &'b wgpu::BindGroup,
+    ) {
+        self.draw_line_instanced(line, 0..1, global_bind_group);
+    }
+
+    fn draw_line_instanced(
+        &mut self,
+        line: &'b Line,
+        instances: Range<u32>,
+        global_bind_group: &'b wgpu::BindGroup,
+    ) {
+        self.set_vertex_buffer(0, line.vertex_buffer.slice(..));
+        self.set_bind_group(0, global_bind_group, &[]);
+        self.draw(0..line.num_vertices, instances);
     }
 }

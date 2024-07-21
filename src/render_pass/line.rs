@@ -4,7 +4,7 @@ use crate::{
         self,
         Camera,
         CameraUniform,
-    }, debug::{self, line::{Line, Vertex}}, texture::Texture
+    }, debug::{self, line::{DrawLine, Line, Vertex}}, instance, object::Object, texture::Texture
 };
 use super::RenderPass;
 use wgpu::util::DeviceExt;
@@ -14,6 +14,7 @@ pub struct LinePass {
     pub global_bind_group_layout: wgpu::BindGroupLayout,
     pub global_bind_group: wgpu::BindGroup,
     pub render_pipeline: wgpu::RenderPipeline,
+    pub instance_buffers: HashMap<usize, wgpu::Buffer>,
 }
 
 impl LinePass {
@@ -78,7 +79,7 @@ impl LinePass {
             vertex: wgpu::VertexState {
                 module: &line_shader,
                 entry_point: "vs_main",
-                buffers: &[debug::line::LineVertex::describe()],
+                buffers: &[debug::line::LineVertex::describe(), instance::RawInstance::describe()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &line_shader,
@@ -116,6 +117,8 @@ impl LinePass {
             },
             multiview: None,
         });
+        
+        let instance_buffers = HashMap::new();
 
         Self {
             camera_uniform,
@@ -123,17 +126,18 @@ impl LinePass {
             global_bind_group_layout,
             global_bind_group,
             render_pipeline,
+            instance_buffers,
         }
     }
 }
 
-impl RenderPass<Line> for LinePass {
+impl RenderPass<Object<Line>> for LinePass {
     fn draw(
         &mut self,
         app_data: &AppData,
         view: &wgpu::TextureView,
         mut encoder: wgpu::CommandEncoder,
-        objects: &Vec<Line>,
+        objects: &Vec<Object<Line>>,
         depth_texture: Option<&Texture>,
         clear_color: &Option<wgpu::Color>,
     ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
@@ -173,10 +177,30 @@ impl RenderPass<Line> for LinePass {
         });
         render_pass.set_pipeline(&self.render_pipeline);
 
+        // Update instance buffer if necessary
         for (object_idx, object) in objects.iter().enumerate() {
-            render_pass.set_vertex_buffer(0, object.vertex_buffer.slice(..));
-            render_pass.set_bind_group(0, &self.global_bind_group, &[]);
-            render_pass.draw(0..object.num_vertices, 0..1);
+            let create_instance_buffer = || {
+                let instance_data = object.instances.iter().map(instance::Instance::to_raw).collect::<Vec<_>>();
+                app_data.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Line Instance Buffer"),
+                        contents: bytemuck::cast_slice(&instance_data),
+                        usage: wgpu::BufferUsages::VERTEX,
+                })
+            };
+            self.instance_buffers
+                .entry(object_idx)
+                .and_modify(|value| {*value = create_instance_buffer()})
+                .or_insert_with(create_instance_buffer);
+        }
+        
+        // Draw instances for all objects
+        for (object_idx, object) in objects.iter().enumerate() {
+            render_pass.set_vertex_buffer(1, self.instance_buffers[&object_idx].slice(..));
+            render_pass.draw_line_instanced(
+                &object.model,
+                0..object.instances.len() as u32,
+                &self.global_bind_group,
+            );
         }
         
         drop(render_pass); // Need to drop `render_pass` to release the mutable borrow of `encoder` so we can call `encoder.finish()`
