@@ -42,6 +42,7 @@ struct State {
     depth_texture: texture::Texture,
     camera: camera::Camera,
     camera_controller: camera::CameraController,
+    clear_color: Option<wgpu::Color>,
 }
 
 impl State {
@@ -116,6 +117,13 @@ impl State {
 
         app_data.egui_renderer.add_gui_window("performance", Box::new(gui::windows::performance::PerformanceWindow::new()));
         app_data.egui_renderer.add_gui_window("stats", Box::new(gui::windows::stats::StatsWindow::new()));
+
+        let clear_color = Some(wgpu::Color {
+            r: 0.1,
+            g: 0.2,
+            b: 0.5,
+            a: 1.0,
+        });
         
         Self {
             basic_pass,
@@ -125,6 +133,7 @@ impl State {
             depth_texture,
             camera,
             camera_controller,
+            clear_color,
         }
     }
 }
@@ -206,6 +215,7 @@ fn render(
         encoder,
         &state.phong_objects,
         Some(&state.depth_texture),
+        &state.clear_color,
     ).unwrap();
     encoder = state.basic_pass.draw(
         app_data,
@@ -213,6 +223,7 @@ fn render(
         encoder,
         &state.basic_objects,
         Some(&state.depth_texture),
+        &None,
     ).unwrap();
 
     app_data.egui_renderer.draw(
