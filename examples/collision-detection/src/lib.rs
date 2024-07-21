@@ -71,14 +71,16 @@ impl State {
             let rotation = cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0));
             Instance { position, rotation, rotation_speed: 0.0 }
         }).collect::<Vec<_>>();
+
+        let cuboid = primitives::cuboid::Cuboid::new(
+            "cube",
+            cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 }
+        );
         
         let primitive_cuboid_object = {
             let model = Model {
                 meshes: vec![
-                    primitives::cuboid::Cuboid::new(
-                        "cube",
-                        cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 }
-                    ).build_mesh(&app_data.device),
+                    cuboid.build_mesh(&app_data.device),
                 ],
                 materials: vec![
                     Material::default(
@@ -97,12 +99,9 @@ impl State {
         let depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "Depth Texture");
 
         let lines = vec![
-            debug::line::Line::new(
-                "debug_line",
-                vec![
-                    [-9.0, 9.0, 0.0],
-                    [-3.0, -0.0, 0.0],
-                ],
+            debug::line::Line::from_cuboid(
+                "cuboid",
+                &cuboid,
                 &app_data.device,
             ),
         ];
@@ -160,6 +159,7 @@ fn update(
     // Move camera
     state.camera_controller.update_camera(&mut state.camera);
     state.phong_pass.camera_uniform.update_view_proj(&state.camera);
+    state.line_pass.camera_uniform.update_view_proj(&state.camera);
 
     // Update GUI
     app_data.egui_renderer.send_event(

@@ -3,11 +3,11 @@ use crate::{mesh::Mesh, vertex};
 use super::Meshable;
 
 pub struct Cuboid {
-    name: String,
-    positions: Vec<[f32; 3]>,
-    normals: Vec<[f32; 3]>,
-    uvs: Vec<[f32; 2]>,
-    indices: Vec<u32>,
+    pub name: String,
+    pub positions: Vec<[f32; 3]>,
+    pub normals: Vec<[f32; 3]>,
+    pub uvs: Vec<[f32; 2]>,
+    pub indices: Vec<u32>,
 }
 
 // Build a cuboid, assuming that the cuboid is centered around the origin

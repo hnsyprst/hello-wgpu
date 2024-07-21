@@ -90,7 +90,7 @@ impl LinePass {
                 })],
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineList, // Every three vertices will correspond to one triangle
+                topology: wgpu::PrimitiveTopology::LineStrip, // Every three vertices will correspond to one triangle
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw, // Tris are facing forward if vertices are arranged in counter-clockwise order
                 cull_mode: Some(wgpu::Face::Back), // Tris not facing forward should be culled
