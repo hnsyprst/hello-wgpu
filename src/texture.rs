@@ -1,4 +1,4 @@
-use image::GenericImageView;
+use image::{DynamicImage, GenericImageView};
 use anyhow::*;
 
 pub struct Texture {
@@ -18,16 +18,57 @@ impl Texture {
         is_normal_map: bool,
     ) -> Result<Self> {
         let img = image::load_from_memory(bytes)?;
-        Self::from_image(device, queue, &img, Some(label), is_normal_map)
+        Ok(Self::from_image(device, queue, &img, Some(label), is_normal_map))
     }
 
+    pub fn default_diffuse(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> Self {
+        let mut bytes = [[0u8; 3]; 256 * 256];
+        {
+            for i in 0..255 {
+                for j in 0..255 {
+                    if i / 32 % 2 == 0 {
+                        if j / 32 % 2 == 0 {
+                            bytes[i * 256 + j] = [255, 0, 255];
+                        } else {
+                            bytes[i * 256 + j] = [0, 0, 0];
+                        }
+                    }
+                    else {
+                        if j / 32 % 2 == 0 {
+                            bytes[i * 256 + j] = [0, 0, 0];
+                        } else {
+                            bytes[i * 256 + j] = [255, 0, 255];
+                        }
+                    }
+                }
+            }
+        }
+
+        let img = DynamicImage::from(
+            image::RgbImage::from_raw(256, 256, bytes.to_vec().into_iter().flatten().collect()).unwrap()
+        );
+            
+        Self::from_image(
+            device,
+            queue,
+            &img,
+            Some("default_diffuse_texture"),
+            false,
+        )
+    }
+
+
+    // TODO: Need Result<>?
     pub fn from_image(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         img: &image::DynamicImage,
         label: Option<&str>,
         is_normal_map: bool,
-    ) -> Result<Self> {
+    ) -> Self {
         let rgba = img.to_rgba8();
         let dimensions = img.dimensions();
         let format = if is_normal_map {
@@ -81,7 +122,7 @@ impl Texture {
             ..Default::default()
         });
 
-        Ok(Self { texture, view, sampler })
+        Self { texture, view, sampler }
     }
 
     pub fn create_depth_texture(

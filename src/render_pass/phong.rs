@@ -12,10 +12,10 @@ use crate::{
         self,
         DrawModel,
         Material,
-        Vertex,
     },
     object:: Object,
     texture::Texture,
+    vertex::{self, Vertex},
 };
 use super::RenderPass;
 use wgpu::util::DeviceExt;
@@ -125,7 +125,7 @@ impl PhongPass {
             vertex: wgpu::VertexState {
                 module: &phong_shader,
                 entry_point: "vs_main",
-                buffers: &[model::ModelVertex::describe(), instance::RawInstance::describe()],
+                buffers: &[vertex::ModelVertex::describe(), instance::RawInstance::describe()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &phong_shader,

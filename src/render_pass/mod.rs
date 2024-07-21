@@ -1,8 +1,8 @@
 use crate::{object::Object, app::AppData, texture::Texture};
 
-pub mod phong;
 pub mod basic;
-
+pub mod phong;
+pub mod wireframe;
 pub trait RenderPass {
     fn draw(
         &mut self,

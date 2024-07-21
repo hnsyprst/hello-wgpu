@@ -11,10 +11,10 @@ use crate::{
     model::{
         self,
         DrawLight,
-        Vertex
     },
     object::Object,
     texture::Texture,
+    vertex::{self, Vertex},
 };
 use super::RenderPass;
 use wgpu::util::DeviceExt;
@@ -120,7 +120,7 @@ impl BasicPass {
             vertex: wgpu::VertexState {
                 module: &basic_shader,
                 entry_point: "vs_main",
-                buffers: &[model::ModelVertex::describe(), instance::RawInstance::describe()],
+                buffers: &[vertex::ModelVertex::describe(), instance::RawInstance::describe()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &basic_shader,

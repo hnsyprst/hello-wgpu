@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
 use cube_settings_gui::CubeSettingsEvent;
+use hello_wgpu::model::Material;
+use hello_wgpu::model::Model;
+use hello_wgpu::primitives;
 #[cfg(target_arch="wasm32")]
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch="wasm32")]
@@ -29,6 +32,8 @@ use winit::{event::WindowEvent, event_loop::EventLoop};
 struct State {
     phong_pass: render_pass::phong::PhongPass,
     phong_objects: Vec<object::Object>,
+    // wireframe_pass: render_pass::wireframe::WireframePass,
+    // wireframe_objects: Vec<object::Object>,
     depth_texture: texture::Texture,
     camera: camera::Camera,
     camera_controller: camera::CameraController,
@@ -52,6 +57,7 @@ impl State {
         let camera_controller = camera::CameraController::new(0.2);
 
         let phong_pass = render_pass::phong::PhongPass::new(&app_data.device, &app_data.queue, &app_data.config, &camera);
+        // let wireframe_pass = render_pass::wireframe::WireframePass::new(&app_data.device, &app_data.queue, &app_data.config, &camera);
 
         // Load models
         let cube_model = resources::load_model("cube.obj", &app_data.device, &app_data.queue, &phong_pass.texture_bind_group_layout, Some(env!("OUT_DIR"))).await.unwrap();
@@ -63,8 +69,30 @@ impl State {
             let rotation = cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0));
             Instance { position, rotation, rotation_speed: 0.0 }
         }).collect::<Vec<_>>();
+        
+        let wireframe_object = {
+            let model = Model {
+                meshes: vec![
+                    primitives::build_mesh( 
+                        primitives::create_cuboid(
+                            "cube",
+                            cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 }
+                        ),
+                        &app_data.device,
+                    )
+                ],
+                materials: vec![Material::default(
+                    &app_data.device,
+                    &app_data.queue,
+                    &phong_pass.texture_bind_group_layout,
+                )],
+            };
+            let instance = Instance { position: cgmath::Vector3 { x: 5.0, y: 5.0, z: 1.0 }, rotation: cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0)), rotation_speed: 0.0 };
+            object::Object{ model, instances: vec![instance] }
+        };
         let phong_objects = vec![
             object::Object{ model: cube_model, instances: cube_instances },
+            wireframe_object,
         ];
         let depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "Depth Texture");
 
@@ -75,6 +103,8 @@ impl State {
         Self {
             phong_pass,
             phong_objects,
+            // wireframe_pass,
+            // wireframe_objects,
             depth_texture,
             camera,
             camera_controller,
