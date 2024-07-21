@@ -1,5 +1,6 @@
 pub mod app;
 pub mod camera;
+pub mod collision;
 pub mod debug;
 pub mod gui;
 pub mod instance;
