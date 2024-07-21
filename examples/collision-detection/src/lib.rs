@@ -74,7 +74,7 @@ impl State {
         let wireframe_object = {
             let model = Model {
                 meshes: vec![
-                    primitives::Cuboid::new(
+                    primitives::cuboid::Cuboid::new(
                         "cube",
                         cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 }
                     ).build_mesh(&app_data.device),
