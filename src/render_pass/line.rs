@@ -135,8 +135,9 @@ impl RenderPass<Line> for LinePass {
         mut encoder: wgpu::CommandEncoder,
         objects: &Vec<Line>,
         depth_texture: Option<&Texture>,
+        clear_color: &Option<wgpu::Color>,
     ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
-        // Create a `RenderPass` to clear and render the frame
+        // Create a `RenderPass` to render the frame
 
         app_data.queue.write_buffer(&self.camera_uniform_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
 
@@ -146,8 +147,11 @@ impl RenderPass<Line> for LinePass {
                 view: view, // Render to the view created above (the output texture)
                 resolve_target: None, // The same as `view` unless multisampling is enabled
                 ops: wgpu::Operations {
-                    // Load tells wgpu what to do with colours stored from the previous frame (here we're just clearing them to a specified colour)
-                    load: wgpu::LoadOp::Load,
+                    // Load tells wgpu what to do with colours stored from the previous frame
+                    load: match clear_color { 
+                        Some(clear_color) => { wgpu::LoadOp::Clear(*clear_color) },
+                        _ => { wgpu::LoadOp::Load },
+                    },
                     // Tells wgpu whether we want to store the rendered results to the `Texture` behind the `TextureView` in `view`
                     // In this case, that `Texture` is the `SurfaceTexture` and we do want to store the rendered results there
                     store: wgpu::StoreOp::Store, 
@@ -156,7 +160,10 @@ impl RenderPass<Line> for LinePass {
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &depth_texture.unwrap().view,
                 depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
+                    load: match clear_color {
+                        Some(_) => { wgpu::LoadOp::Clear(1.0) },
+                        _ => { wgpu::LoadOp::Load },
+                    },
                     store: wgpu::StoreOp::Store,
                 }),
                 stencil_ops: None,
