@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use wgpu::util::DeviceExt;
-use crate::{mesh::Mesh, primitives::cuboid::Cuboid, vertex};
+use crate::{mesh::Mesh, primitives::{cuboid::Cuboid, sphere::Sphere}, vertex};
 
 pub trait Vertex {
     fn describe() -> wgpu::VertexBufferLayout<'static>;
@@ -46,26 +46,6 @@ impl Line {
     ) -> Self {
         let vertices = positions.iter().map(|p| LineVertex { position: *p }).collect::<Vec<_>>();
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{:?} Vertex Buffer", name)),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        Self {
-            name: name.to_string(),
-            vertex_buffer: vertex_buffer,
-            num_vertices: vertices.len() as u32,
-        }
-    }
-
-    pub fn from_cuboid(
-        name: &str,
-        cuboid: &Cuboid,
-        device: &wgpu::Device,
-    ) -> Self {
-        let vertices = cuboid.indices.iter().map(|i| LineVertex { position: cuboid.positions[*i as usize] }).collect::<Vec<_>>();
-        
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("{:?} Vertex Buffer", name)),
             contents: bytemuck::cast_slice(&vertices),

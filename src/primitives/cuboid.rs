@@ -4,10 +4,8 @@ use super::Meshable;
 
 pub struct Cuboid {
     pub name: String,
-    pub positions: Vec<[f32; 3]>,
-    pub normals: Vec<[f32; 3]>,
-    pub uvs: Vec<[f32; 2]>,
-    pub indices: Vec<u32>,
+    min: cgmath::Vector3<f32>,
+    max: cgmath::Vector3<f32>,
 }
 
 // Build a cuboid, assuming that the cuboid is centered around the origin
@@ -18,39 +16,57 @@ impl Cuboid {
     ) -> Self {
         let min = -half_size;
         let max = half_size;
-        
+
+        Self {
+            name: name.to_string(),
+            min,
+            max,
+        }
+    }
+}
+
+impl Meshable for Cuboid {
+    fn get_vecs(
+            &self,
+            resolution: i32,
+        ) -> (
+            Vec<[f32; 3]>,
+            Vec<[f32; 3]>,
+            Vec<[f32; 2]>,
+            Vec<u32>,
+        ) {
         // Faces arranged CCW
         let positions_uvs = vec![
             // Front face
-            ([min.x, min.y, max.z], [0.0, 0.0]), // 0
-            ([max.x, min.y, max.z], [1.0, 0.0]),
-            ([max.x, max.y, max.z], [1.0, 1.0]),
-            ([min.x, max.y, max.z], [0.0, 1.0]),
+            ([self.min.x, self.min.y, self.max.z], [0.0, 0.0]), // 0
+            ([self.max.x, self.min.y, self.max.z], [1.0, 0.0]),
+            ([self.max.x, self.max.y, self.max.z], [1.0, 1.0]),
+            ([self.min.x, self.max.y, self.max.z], [0.0, 1.0]),
             // Back face
-            ([min.x, max.y, min.z], [1.0, 0.0]), // 4
-            ([max.x, max.y, min.z], [0.0, 0.0]),
-            ([max.x, min.y, min.z], [0.0, 1.0]),
-            ([min.x, min.y, min.z], [1.0, 1.0]),
+            ([self.min.x, self.max.y, self.min.z], [1.0, 0.0]), // 4
+            ([self.max.x, self.max.y, self.min.z], [0.0, 0.0]),
+            ([self.max.x, self.min.y, self.min.z], [0.0, 1.0]),
+            ([self.min.x, self.min.y, self.min.z], [1.0, 1.0]),
             // Right face
-            ([max.x, min.y, min.z], [0.0, 0.0]), // 8
-            ([max.x, max.y, min.z], [1.0, 0.0]),
-            ([max.x, max.y, max.z], [1.0, 1.0]),
-            ([max.x, min.y, max.z], [0.0, 1.0]),
+            ([self.max.x, self.min.y, self.min.z], [0.0, 0.0]), // 8
+            ([self.max.x, self.max.y, self.min.z], [1.0, 0.0]),
+            ([self.max.x, self.max.y, self.max.z], [1.0, 1.0]),
+            ([self.max.x, self.min.y, self.max.z], [0.0, 1.0]),
             // Left face
-            ([min.x, min.y, max.z], [1.0, 0.0]), // 12
-            ([min.x, max.y, max.z], [0.0, 0.0]),
-            ([min.x, max.y, min.z], [0.0, 1.0]),
-            ([min.x, min.y, min.z], [1.0, 1.0]),
+            ([self.min.x, self.min.y, self.max.z], [1.0, 0.0]), // 12
+            ([self.min.x, self.max.y, self.max.z], [0.0, 0.0]),
+            ([self.min.x, self.max.y, self.min.z], [0.0, 1.0]),
+            ([self.min.x, self.min.y, self.min.z], [1.0, 1.0]),
             // Top face
-            ([max.x, max.y, min.z], [1.0, 0.0]), // 16
-            ([min.x, max.y, min.z], [0.0, 0.0]),
-            ([min.x, max.y, max.z], [0.0, 1.0]),
-            ([max.x, max.y, max.z], [1.0, 1.0]),
+            ([self.max.x, self.max.y, self.min.z], [1.0, 0.0]), // 16
+            ([self.min.x, self.max.y, self.min.z], [0.0, 0.0]),
+            ([self.min.x, self.max.y, self.max.z], [0.0, 1.0]),
+            ([self.max.x, self.max.y, self.max.z], [1.0, 1.0]),
             // Bottom face
-            ([max.x, min.y, max.z], [0.0, 0.0]), // 20
-            ([min.x, min.y, max.z], [1.0, 0.0]),
-            ([min.x, min.y, min.z], [1.0, 1.0]),
-            ([max.x, min.y, min.z], [0.0, 1.0]),
+            ([self.max.x, self.min.y, self.max.z], [0.0, 0.0]), // 20
+            ([self.min.x, self.min.y, self.max.z], [1.0, 0.0]),
+            ([self.min.x, self.min.y, self.min.z], [1.0, 1.0]),
+            ([self.max.x, self.min.y, self.min.z], [0.0, 1.0]),
         ];
         let (positions, uvs): (Vec<[f32; 3]>, Vec<[f32; 2]>) = positions_uvs.into_iter().unzip();
         let indices = vec![
@@ -73,27 +89,30 @@ impl Cuboid {
             face_normals[i / 4]
         }).collect::<Vec<_>>();
 
-        Self {
-            name: name.to_string(),
+        (
             positions,
             normals,
             uvs,
-            indices,
-        }
+            indices
+        )
     }
-}
 
-impl Meshable for Cuboid {
     fn build_mesh(
         &self,
         device: &wgpu::Device,
+        positions: Vec<[f32; 3]>,
+        normals: Vec<[f32; 3]>,
+        uvs: Vec<[f32; 2]>,
+        indices: Vec<u32>,
+        resolution: i32,
     ) -> Mesh {
         let vertices = vertex::vecs_to_model_vertices(
-            &self.positions,
-            &self.normals,
-            &self.uvs,
-            &self.indices);
-    
+            &positions,
+            &normals,
+            &uvs,
+            &indices,
+        );
+
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("{:?} Vertex Buffer", self.name)),
             contents: bytemuck::cast_slice(&vertices),
@@ -101,7 +120,7 @@ impl Meshable for Cuboid {
         });
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(&format!("{:?} Index Buffer", self.name)),
-            contents: bytemuck::cast_slice(&self.indices),
+            contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         });
     
@@ -109,7 +128,7 @@ impl Meshable for Cuboid {
             name: self.name.to_string(),
             vertex_buffer: vertex_buffer,
             index_buffer: index_buffer,
-            num_elements: self.indices.len() as u32,
+            num_elements: indices.len() as u32,
             material: 0,
         }
     }
