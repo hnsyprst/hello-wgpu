@@ -1,11 +1,7 @@
 use std::ops::Range;
 
 use wgpu::util::DeviceExt;
-use crate::{mesh::Mesh, primitives::{cuboid::Cuboid, sphere::Sphere}, vertex};
-
-pub trait Vertex {
-    fn describe() -> wgpu::VertexBufferLayout<'static>;
-}
+use crate::{mesh::Mesh, primitives::{cuboid::Cuboid, sphere::Sphere}, vertex::Vertex};
 
 // When adding a field here, remember to add it's corresponding wgpu::VertexAttribute to LineVertex::describe()
 #[repr(C)]

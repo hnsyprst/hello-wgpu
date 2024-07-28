@@ -4,7 +4,7 @@ use crate::{
         self,
         Camera,
         CameraUniform,
-    }, debug::{self, line::{DrawLine, Line, Vertex}}, instance, object::Object, texture::Texture
+    }, debug::{self, line::{DrawLine, Line}}, instance, object::Object, texture::Texture, vertex::Vertex
 };
 use super::RenderPass;
 use wgpu::util::DeviceExt;
@@ -91,10 +91,10 @@ impl LinePass {
                 })],
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineStrip, // Every three vertices will correspond to one triangle
+                topology: wgpu::PrimitiveTopology::LineList,
                 strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw, // Tris are facing forward if vertices are arranged in counter-clockwise order
-                cull_mode: Some(wgpu::Face::Back), // Tris not facing forward should be culled
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
                 // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
                 polygon_mode: wgpu::PolygonMode::Fill,
                 // Requires Features::DEPTH_CLIP_CONTROL

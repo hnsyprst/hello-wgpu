@@ -28,7 +28,6 @@ impl Cuboid {
 impl Meshable for Cuboid {
     fn get_vecs(
             &self,
-            resolution: i32,
         ) -> (
             Vec<[f32; 3]>,
             Vec<[f32; 3]>,
@@ -104,7 +103,6 @@ impl Meshable for Cuboid {
         normals: Vec<[f32; 3]>,
         uvs: Vec<[f32; 2]>,
         indices: Vec<u32>,
-        resolution: i32,
     ) -> Mesh {
         let vertices = vertex::vecs_to_model_vertices(
             &positions,

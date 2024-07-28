@@ -6,7 +6,6 @@ pub mod sphere;
 pub trait Meshable {
     fn get_vecs(
         &self,
-        resolution: i32,
     ) -> (
         Vec<[f32; 3]>,
         Vec<[f32; 3]>,
@@ -21,6 +20,5 @@ pub trait Meshable {
         normals: Vec<[f32; 3]>,
         uvs: Vec<[f32; 2]>,
         indices: Vec<u32>,
-        resolution: i32,
     ) -> Mesh;
 }

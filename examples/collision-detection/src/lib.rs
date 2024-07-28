@@ -6,6 +6,7 @@ use controls_gui::StateEvent;
 use hello_wgpu::collision;
 use hello_wgpu::collision::aabb::AxisAlignedBoundingBox;
 use hello_wgpu::debug::line::Line;
+use hello_wgpu::debug::wireframe::Wireframe;
 use hello_wgpu::model::Material;
 use hello_wgpu::model::Model;
 use hello_wgpu::object::Object;
@@ -79,29 +80,31 @@ impl State {
         let cuboid = Cuboid::new("cube", half_size);
         let sphere = Sphere::new("sphere", 3.0, 16);
 
-        let (objects, colliders): (Vec<Object<Line>>, Vec<AxisAlignedBoundingBox>) = [&cuboid as &dyn Meshable, &sphere as &dyn Meshable].iter().enumerate().map(|(idx, primitive)| {
-            let ( positions, normals, uvs, indices ) = primitive.get_vecs(16);
-            let model = Line::new(
-                "primitive", 
-                indices.iter().map(|i| positions[*i as usize]).collect::<Vec<_>>(), 
-                &app_data.device,
-            );
+        let cuboid_wireframe = cuboid.to_wireframe("Cuboid Wireframe", &app_data.device);
+        let sphere_wireframe = sphere.to_wireframe("Sphere Wireframe", &app_data.device);
 
-            let position = cgmath::Vector3::new((idx as f32 * 10.0) - 5.0, 1.0, 1.0);
+        let mut objects = Vec::with_capacity(2);
+        let mut colliders = Vec::with_capacity(2);
+
+        for (index, line) in [cuboid_wireframe, sphere_wireframe].into_iter().enumerate() {
+            let position = cgmath::Vector3::new((index as f32 * 10.0) - 5.0, 1.0, 1.0);
             let rotation = cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0));
-
-            let instance = Instance { position, rotation, rotation_speed: 0.0 };
+            let instance = Instance { position, rotation, rotation_speed: 0.0 };    
+            objects.push(
+                Object { model: line, instances: vec![instance] }
+            );
+            
             let collider = collision::aabb::AxisAlignedBoundingBox::new(-half_size + position, half_size + position);
-
-            (Object { model, instances: vec![instance] }, collider)
-        }).unzip();
+            colliders.push(
+                collider,
+            );
+        }
 
         let depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "Depth Texture");
 
         app_data.egui_renderer.add_gui_window("performance", Box::new(gui::windows::performance::PerformanceWindow::new()));
         app_data.egui_renderer.add_gui_window("stats", Box::new(gui::windows::stats::StatsWindow::new()));
         app_data.egui_renderer.add_gui_window("controls", Box::new(controls_gui::ControlsWindow::new(objects[0].instances[0].position)));
-        
         let clear_color = Some(wgpu::Color {
                 r: 0.1,
                 g: 0.2,
