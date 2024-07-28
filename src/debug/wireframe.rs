@@ -12,6 +12,7 @@ pub trait Wireframe {
 }
 
 // Convert `TriangleList` format primitives into `LineList` compatible `debug::line::Line`
+// TODO: Add indexing for Line to make this less costly
 impl<T: Meshable> Wireframe for T{
     fn to_wireframe(
             &self,
@@ -46,3 +47,5 @@ impl<T: Meshable> Wireframe for T{
         }
     }
 }
+
+// TODO: impl Wireframe for Mesh
