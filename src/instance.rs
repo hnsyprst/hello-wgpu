@@ -57,6 +57,7 @@ impl RawInstance {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Instance {
     pub position: cgmath::Vector3<f32>,
     pub rotation: cgmath::Quaternion<f32>,

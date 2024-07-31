@@ -1,10 +1,14 @@
 use std::sync::Arc;
 
+use controls_gui::ColliderChoice;
 use controls_gui::CollisionEvent;
 use controls_gui::ControlsEvent;
 use controls_gui::StateEvent;
 use hello_wgpu::collision;
-use hello_wgpu::collision::aabb::AxisAlignedBoundingBox;
+use hello_wgpu::collision::aabb;
+use hello_wgpu::collision::aabb::AxisAlignedBoundingBoxCollider;
+use hello_wgpu::collision::Collider;
+use hello_wgpu::collision::ColliderEnum;
 use hello_wgpu::debug::line::Line;
 use hello_wgpu::debug::wireframe::Wireframe;
 use hello_wgpu::model::Material;
@@ -43,11 +47,12 @@ use winit::{event::WindowEvent, event_loop::EventLoop};
 struct State {
     line_pass: render_pass::line::LinePass,
     objects: Vec<Object<Line>>,
-    colliders: Vec<collision::aabb::AxisAlignedBoundingBox>,
+    all_colliders: Vec<ColliderEnum>,
     depth_texture: texture::Texture,
     camera: camera::Camera,
     camera_controller: camera::CameraController,
     clear_color: Option<wgpu::Color>,
+    moving_object_index: usize,
 }
 
 impl State {
@@ -56,7 +61,7 @@ impl State {
     ) -> Self {
         // Set up camera
         let camera = camera::Camera::new(
-            cgmath::Point3::new(0.0, 10.0, 30.0),
+            cgmath::Point3::new(0.0, 30.0, 30.0),
             cgmath::Point3::new(0.0, 0.0, 0.0),
             cgmath::Vector3::unit_y(),
             app_data.config.width as f32 / app_data.config.height as f32,
@@ -84,21 +89,28 @@ impl State {
         let sphere_wireframe = sphere.to_wireframe("Sphere Wireframe", &app_data.device);
 
         let mut objects = Vec::with_capacity(2);
-        let mut colliders = Vec::with_capacity(2);
+        let mut all_colliders: Vec<ColliderEnum> = Vec::with_capacity(4);
 
-        for (index, line) in [cuboid_wireframe, sphere_wireframe].into_iter().enumerate() {
-            let position = cgmath::Vector3::new((index as f32 * 10.0) - 5.0, 1.0, 1.0);
-            let rotation = cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0));
-            let instance = Instance { position, rotation, rotation_speed: 0.0 };    
-            objects.push(
-                Object { model: line, instances: vec![instance] }
-            );
-            
-            let collider = collision::aabb::AxisAlignedBoundingBox::new(-half_size + position, half_size + position);
-            colliders.push(
-                collider,
-            );
-        }
+        let instances = (0..2).flat_map(|i| {
+            (0..2).map(move |j| {
+                let position = cgmath::Vector3::new((i as f32 * 10.0) - 5.0, 1.0, (j as f32 * 10.0) - 5.0);
+                let rotation = cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0));
+                Instance { position, rotation, rotation_speed: 0.0 }
+            })
+        }).collect::<Vec<_>>();
+
+        for instance in instances[0..2].to_vec().iter() {
+            all_colliders.push(ColliderEnum::AABB(collision::aabb::AxisAlignedBoundingBoxCollider::new(half_size, instance.position)));
+        };
+        for instance in instances[2..].to_vec().iter() {
+            all_colliders.push(ColliderEnum::Sphere(collision::sphere::SphereCollider::new(half_size.x, instance.position)));
+        };
+        objects.push(
+            Object { model: cuboid_wireframe, instances: instances[0..2].to_vec() },
+        );
+        objects.push(
+            Object { model: sphere_wireframe, instances: instances[2..].to_vec() },
+        );
 
         let depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "Depth Texture");
 
@@ -112,14 +124,17 @@ impl State {
                 a: 1.0,
         });
 
+        let moving_object_index = 0;
+
         Self {
             line_pass,
             objects,
-            colliders,
+            all_colliders,
             depth_texture,
             camera,
             camera_controller,
             clear_color,
+            moving_object_index,
         }
     }
 }
@@ -144,30 +159,64 @@ fn resize(
     state.depth_texture = texture::Texture::create_depth_texture(&app_data.device, &app_data.config, "depth_texture");
 }
 
+fn check_for_collision(
+    collider_index: usize,
+    all_colliders: &Vec<ColliderEnum>,
+) -> bool {
+    let (left, right) = all_colliders.split_at(collider_index);
+    let (collider, remaining) = right.split_first().unwrap();
+
+    let collisions = left.iter().chain(remaining.iter()).map(|other_collider| {
+        match other_collider {
+            ColliderEnum::AABB(aabb) => aabb.is_colliding_with(collider),
+            ColliderEnum::Sphere(sphere) => sphere.is_colliding_with(collider),
+        }
+    }).collect::<Vec<_>>();
+    return collisions.into_iter().any(|collision| collision);
+}
+
 fn update(
     app_data: &mut app::AppData,
     state: &mut State,
 ) {
     // Move instances
     if let Some(controls_event) = app_data.egui_renderer.receive_event("controls").downcast_ref::<StateEvent>() {
-        let position = controls_event.position;
-        state.objects[0].instances[0] = Instance {
-            position,
-            rotation: state.objects[0].instances[0].rotation,
-            rotation_speed: state.objects[0].instances[0].rotation_speed,
+        if state.moving_object_index != controls_event.moving_collider as usize {
+            state.moving_object_index = controls_event.moving_collider as usize;
+            app_data.egui_renderer.send_event(
+                "controls", 
+                &ControlsEvent { 
+                    position: state.objects[state.moving_object_index].instances[0].position,
+                 },
+            );
+        }
+        else {
+            let position = controls_event.position;
+            state.objects[state.moving_object_index].instances[0] = Instance {
+                position,
+                rotation: state.objects[state.moving_object_index].instances[0].rotation,
+                rotation_speed: state.objects[state.moving_object_index].instances[0].rotation_speed,
+            }
         }
     };
 
-    state.colliders = state.objects.iter().flat_map(|object| {
-        object.instances.iter().map(move |instance| {
-            let position = instance.position;
-            let half_size = cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 };
-            collision::aabb::AxisAlignedBoundingBox::new(
-                -half_size + position,
-                half_size + position,
-            )
-        })
+    let all_instances = state.objects
+    .iter()
+    .flat_map(|object| {
+        &object.instances
     }).collect::<Vec<_>>();
+    
+    let half_size = cgmath::Vector3 { x: 3.0, y: 3.0, z: 3.0 };
+    all_instances
+        .iter()
+        .zip(&mut state.all_colliders)
+        .for_each(|(instance, collider)| {
+            let position = instance.position;
+            match collider {
+                ColliderEnum::AABB(aabb) => aabb.update(half_size, position),
+                ColliderEnum::Sphere(sphere) => sphere.update(half_size.x, position),
+            }
+        });
 
     // Move camera
     state.camera_controller.update_camera(&mut state.camera);
@@ -188,11 +237,15 @@ fn update(
             num_instances: state.objects.iter().map(|object| object.instances.len() as u32).sum()
         }
     );
+
+    let is_colliding = check_for_collision(
+        state.moving_object_index * 2, // There are 2 colliders / instances for each collider type, always just get the first one from each group
+        &state.all_colliders,
+    );
+        
     app_data.egui_renderer.send_event(
         "controls", 
-        &CollisionEvent {
-            is_colliding: state.colliders[0].is_aabb_colliding(&state.colliders[1])
-        }
+        &CollisionEvent { is_colliding },
     );
 }
 

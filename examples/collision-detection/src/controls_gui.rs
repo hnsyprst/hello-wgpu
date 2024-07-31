@@ -4,6 +4,13 @@ use hello_wgpu::gui::SendAny;
 
 use hello_wgpu::gui::windows::GuiWindow;
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub enum ColliderChoice {
+    AABB,
+    Sphere,
+} 
+
 pub struct ControlsEvent {
     pub position: Vector3<f32>,
 }
@@ -15,11 +22,14 @@ pub struct CollisionEvent {
 pub struct StateEvent {
     pub position: Vector3<f32>,
     pub is_colliding: bool,
+    pub moving_collider: ColliderChoice,
 }
+
 
 pub struct ControlsWindow {
     pub position: Vector3<f32>,
     pub is_colliding: bool,
+    moving_collider: ColliderChoice,
 }
 
 impl ControlsWindow {
@@ -29,6 +39,7 @@ impl ControlsWindow {
         Self {
             position,
             is_colliding: false,
+            moving_collider: ColliderChoice::AABB,
         }
     }
 }
@@ -53,16 +64,26 @@ impl GuiWindow for ControlsWindow {
                             .speed(0.01)
                         );
                         ui.end_row();
+
                         ui.label("y");
                         ui.add(egui::DragValue::new(&mut self.position.y)
                             .speed(0.01)
                         );
                         ui.end_row();
+
                         ui.label("z");
                         ui.add(egui::DragValue::new(&mut self.position.z)
                             .speed(0.01)
                         );
                         ui.end_row();
+
+                        ui.label("Moving Collider");
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut self.moving_collider, ColliderChoice::AABB, "AABB");
+                            ui.selectable_value(&mut self.moving_collider, ColliderChoice::Sphere, "Sphere");
+                        });
+                        ui.end_row();
+
                         ui.label("Colliding");
                         ui.label(format!("{}", &self.is_colliding));
                         ui.end_row();
@@ -89,6 +110,7 @@ impl GuiWindow for ControlsWindow {
             StateEvent {
                 position: self.position,
                 is_colliding: self.is_colliding,
+                moving_collider: self.moving_collider,
             }
         )
     }
